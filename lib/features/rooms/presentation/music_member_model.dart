@@ -1,18 +1,16 @@
 import 'package:equatable/equatable.dart';
 
-class Member extends Equatable {
+class MusicMember extends Equatable {
   final String id;
   final String name;
   final String role;
-  final String? avatarUrl;
 
-  const Member({
+  const MusicMember({
     required this.id,
     required this.name,
     required this.role,
-    this.avatarUrl,
   });
 
   @override
-  List<Object?> get props => [id, name, role, avatarUrl];
+  List<Object?> get props => [id, name, role];
 }

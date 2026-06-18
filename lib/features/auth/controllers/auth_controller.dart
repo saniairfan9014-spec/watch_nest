@@ -7,29 +7,90 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 });
 
 final authControllerProvider =
-    NotifierProvider<AuthController, AsyncValue<void>>(AuthController.new);
+NotifierProvider<AuthController, AsyncValue<void>>(
+  AuthController.new,
+);
 
 class AuthController extends Notifier<AsyncValue<void>> {
   @override
-  AsyncValue<void> build() => const AsyncValue.data(null);
+  AsyncValue<void> build() {
+    return const AsyncValue.data(null);
+  }
 
   Future<void> signInWithGoogle() async {
     state = const AsyncValue.loading();
+
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
       state = const AsyncValue.data(null);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> signInWithApple() async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).signInWithApple();
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> continueAsGuest() async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).continueAsGuest();
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> signInWithEmail(String email, String password) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).signInWithEmail(email, password);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> signInWithPhone(String phone) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).signInWithPhone(phone);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).resetPassword(email);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
     }
   }
 
   Future<void> signOut() async {
     state = const AsyncValue.loading();
+
     try {
       await ref.read(authRepositoryProvider).signOut();
       state = const AsyncValue.data(null);
-    } catch (e, stack) {
-      state = AsyncValue.error(e, stack);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
     }
   }
 }

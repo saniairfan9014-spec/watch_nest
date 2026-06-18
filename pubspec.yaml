@@ -101,3 +101,4 @@ flutter:
 
 dependency_overrides:
   device_info_plus: ^10.1.0
+  ffi: ^2.0.1

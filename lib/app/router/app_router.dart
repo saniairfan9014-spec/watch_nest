@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/controllers/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/onboarding_screen.dart';
+import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/rooms/presentation/create_room_screen.dart';
 import '../../features/rooms/presentation/join_room_screen.dart';
@@ -24,9 +25,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final isOnSplash = location == AppRoutes.splash;
       final isOnLogin = location == AppRoutes.login;
+      final isOnOnboarding = location == AppRoutes.onboarding;
+      final isOnSignUp = location == AppRoutes.signUp;
 
-      if (!isAuthenticated && !isOnLogin && !isOnSplash) return AppRoutes.login;
-      if (isAuthenticated && (isOnLogin || isOnSplash)) return AppRoutes.home;
+      if (!isAuthenticated && !isOnLogin && !isOnSplash && !isOnOnboarding && !isOnSignUp) return AppRoutes.onboarding;
+      if (isAuthenticated && (isOnLogin || isOnSplash || isOnOnboarding || isOnSignUp)) return AppRoutes.home;
 
       return null;
     },
@@ -40,8 +43,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: AppRoutes.onboarding,
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.signUp,
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         path: AppRoutes.createRoom,

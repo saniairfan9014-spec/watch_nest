@@ -76,6 +76,37 @@ class AuthRepository {
     }
   }
 
+  Future<void> signInWithApple() async {
+    await _supabaseClient.auth.signInWithOAuth(
+      OAuthProvider.apple,
+    );
+  }
+
+  Future<AuthResponse> continueAsGuest() async {
+    final AuthResponse response = await _supabaseClient.auth.signInAnonymously();
+    await _checkAndCreateProfile(response.user);
+    return response;
+  }
+
+  Future<AuthResponse> signInWithEmail(String email, String password) async {
+    final response = await _supabaseClient.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    await _checkAndCreateProfile(response.user);
+    return response;
+  }
+
+  Future<void> signInWithPhone(String phone) async {
+    await _supabaseClient.auth.signInWithOtp(
+      phone: phone,
+    );
+  }
+
+  Future<void> resetPassword(String email) async {
+    await _supabaseClient.auth.resetPasswordForEmail(email);
+  }
+
   Future<void> signOut() async {
     await GoogleSignIn().signOut();
     await _supabaseClient.auth.signOut();

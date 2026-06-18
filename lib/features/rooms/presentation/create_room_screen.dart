@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../../app/theme/app_text_styles.dart';
-import '../../../core/models/room_model.dart';
-import '../data/room_repository.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'create_room_viewmodel.dart';
+import 'room_type.dart';
+import 'room_privacy.dart';
 
 class CreateRoomScreen extends ConsumerStatefulWidget {
   const CreateRoomScreen({super.key});
@@ -15,156 +12,143 @@ class CreateRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
-  final _nameController = TextEditingController();
-  RoomType _selectedType = RoomType.movie;
-  bool _isPublic = true;
-  bool _isLoading = false;
+  final _roomNameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _roomNameController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _createRoom() async {
-    if (_nameController.text.trim().isEmpty) return;
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) return;
+    if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
-    try {
-      final room = await ref.read(roomRepositoryProvider).createRoom(
-            name: _nameController.text.trim(),
-            type: _selectedType,
-            isPublic: _isPublic,
-            hostId: user.id,
-          );
-      if (mounted) context.go('/room/${room.id}');
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final viewModel = ref.read(createRoomViewModelProvider.notifier);
+    await viewModel.createRoom();
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(createRoomViewModelProvider);
+    final viewModel = ref.read(createRoomViewModelProvider.notifier);
+
     return Scaffold(
-      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        title: const Text('Create Room'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
         ),
+        title: const Text('Create Room'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Room Name', style: AppTextStyles.label),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nameController,
-              style: AppTextStyles.bodyLg,
-              decoration: const InputDecoration(
-                hintText: 'e.g. Friday Movie Night 🍿',
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text('Room Type', style: AppTextStyles.label),
-            const SizedBox(height: 12),
-            Row(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _TypeChip(
-                  label: '🎬 Movie',
-                  selected: _selectedType == RoomType.movie,
-                  onTap: () => setState(() => _selectedType = RoomType.movie),
+                const Text(
+                  'Room Name',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(width: 12),
-                _TypeChip(
-                  label: '🎵 Music',
-                  selected: _selectedType == RoomType.music,
-                  onTap: () => setState(() => _selectedType = RoomType.music),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _roomNameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter room name',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter a room name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Room Type',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  children: RoomType.values.map((type) {
+                    final label = type.name[0].toUpperCase() + type.name.substring(1);
+                    return ChoiceChip(
+                      label: Text(label),
+                      selected: state.selectedType == type,
+                      onSelected: (_) => viewModel.setRoomType(type),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Privacy',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 12),
+                RadioListTile<RoomPrivacy>(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Public'),
+                  subtitle: const Text('Anyone can join'),
+                  value: RoomPrivacy.public,
+                  groupValue: state.selectedPrivacy,
+                  onChanged: (v) => viewModel.setPrivacy(v!),
+                ),
+                RadioListTile<RoomPrivacy>(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Private'),
+                  subtitle: const Text('Password protected'),
+                  value: RoomPrivacy.private,
+                  groupValue: state.selectedPrivacy,
+                  onChanged: (v) => viewModel.setPrivacy(v!),
+                ),
+                if (state.selectedPrivacy == RoomPrivacy.private) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Password (Optional)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: state.obscurePassword,
+                    decoration: InputDecoration(
+                      hintText: 'Enter password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          state.obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: viewModel.toggleObscurePassword,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 40),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: state.isLoading ? null : _createRoom,
+                    child: state.isLoading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5),
+                          )
+                        : const Text('Create Room'),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Public Room', style: AppTextStyles.headingSm),
-                    Text('Anyone can discover & join',
-                        style: AppTextStyles.bodyMd),
-                  ],
-                ),
-                Switch(
-                  value: _isPublic,
-                  onChanged: (v) => setState(() => _isPublic = v),
-                  activeThumbColor: AppColors.primary,
-                ),
-              ],
-            ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _createRoom,
-                child: _isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5)
-                    : const Text('Create Room'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TypeChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _TypeChip(
-      {required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.15)
-              : AppColors.bgElevated,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? AppColors.primary : const Color(0xFF2A2A3A),
-            width: selected ? 2 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.bodyLg.copyWith(
-            color: selected ? AppColors.primaryLight : AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
           ),
         ),
       ),

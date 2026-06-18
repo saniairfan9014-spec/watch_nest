@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import 'package:go_router/go_router.dart';
+import '../../../app/router/app_routes.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -27,7 +29,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _scaleAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
-    _controller.forward();
+    _controller.forward().then((_) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          context.go(AppRoutes.onboarding);
+        }
+      });
+    });
   }
 
   @override

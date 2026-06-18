@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_text_styles.dart';
+import '../../../app/router/app_routes.dart';
 import '../controllers/auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,6 +19,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late AnimationController _contentController;
   late Animation<double> _contentFade;
   late Animation<Offset> _contentSlide;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -48,6 +54,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void dispose() {
     _bgController.dispose();
     _contentController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -79,20 +87,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               opacity: _contentFade,
               child: SlideTransition(
                 position: _contentSlide,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Spacer(flex: 2),
+                      const SizedBox(height: 48),
                       _buildLogo(),
                       const SizedBox(height: 20),
                       _buildHeadline(),
-                      const Spacer(flex: 3),
+                      const SizedBox(height: 32),
+                      _buildEmailField(isLoading),
+                      const SizedBox(height: 16),
+                      _buildPasswordField(isLoading),
+                      const SizedBox(height: 8),
+                      _buildForgotPassword(),
+                      const SizedBox(height: 24),
+                      _buildSignInButton(isLoading),
+                      const SizedBox(height: 24),
+                      _buildDivider(),
+                      const SizedBox(height: 24),
                       _buildGoogleButton(isLoading),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
+                      _buildSignUpFooter(),
+                      const SizedBox(height: 16),
                       _buildTermsText(),
-                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -183,6 +202,152 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     );
   }
 
+  Widget _buildEmailField(bool isLoading) {
+    return TextField(
+      controller: _emailController,
+      enabled: !isLoading,
+      keyboardType: TextInputType.emailAddress,
+      autocorrect: false,
+      style: AppTextStyles.bodyMd.copyWith(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: 'Email',
+        hintText: 'Enter your email',
+        prefixIcon: const Icon(Icons.email_outlined, color: AppColors.textMuted),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2E2E42)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2E2E42)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        labelStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
+        hintStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField(bool isLoading) {
+    return TextField(
+      controller: _passwordController,
+      enabled: !isLoading,
+      obscureText: _obscurePassword,
+      style: AppTextStyles.bodyMd.copyWith(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        labelText: 'Password',
+        hintText: 'Enter your password',
+        prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.textMuted),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: AppColors.textMuted,
+          ),
+          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
+        filled: true,
+        fillColor: AppColors.bgCard,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2E2E42)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2E2E42)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        labelStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
+        hintStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
+      ),
+    );
+  }
+
+  Widget _buildForgotPassword() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: () {
+          final email = _emailController.text.trim();
+          if (email.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Enter your email first'),
+                backgroundColor: AppColors.warning,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+            return;
+          }
+          ref.read(authControllerProvider.notifier).resetPassword(email);
+        },
+        child: Text(
+          'Forgot Password?',
+          style: AppTextStyles.bodySm.copyWith(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignInButton(bool isLoading) {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: ElevatedButton(
+        onPressed: isLoading
+            ? null
+            : () {
+                final email = _emailController.text.trim();
+                final password = _passwordController.text;
+                if (email.isEmpty || password.isEmpty) return;
+                ref.read(authControllerProvider.notifier).signInWithEmail(email, password);
+              },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: isLoading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text('Sign In', style: AppTextStyles.button),
+      ),
+    );
+  }
+
+  Widget _buildDivider() {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: Color(0xFF2E2E42))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'or continue with',
+            style: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
+          ),
+        ),
+        const Expanded(child: Divider(color: Color(0xFF2E2E42))),
+      ],
+    );
+  }
+
   Widget _buildGoogleButton(bool isLoading) {
     return SizedBox(
       width: double.infinity,
@@ -234,6 +399,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildSignUpFooter() {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: OutlinedButton(
+        onPressed: () => context.push(AppRoutes.signUp),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.textPrimary,
+          side: const BorderSide(color: Color(0xFF2E2E42), width: 1.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: Text("Don't have an account? Sign Up", style: AppTextStyles.button.copyWith(color: AppColors.textSecondary)),
       ),
     );
   }

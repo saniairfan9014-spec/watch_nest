@@ -1,0 +1,1 @@
+enum RoomPrivacy { public, private }
