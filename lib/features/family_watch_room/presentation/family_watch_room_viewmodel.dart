@@ -42,7 +42,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       currentUserId: 'user-1',
       roomType: RoomType.family,
       announcement: Announcement(
-        text: 'Welcome to Family Movie Night!\nBe kind • Have fun • Enjoy together',
+        text: 'The host didn\'t add anything yet',
         updatedAt: DateTime(2026, 6, 18),
       ),
       seats: List.generate(10, (i) {
@@ -53,7 +53,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
               seatNumber: 1,
               status: SeatStatus.occupied,
               userId: 'user-1',
-              userName: 'Ali',
+              userName: 'Mic 1',
               isHost: true,
             );
           case 2:
@@ -61,25 +61,23 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
               seatNumber: 2,
               status: SeatStatus.occupied,
               userId: 'user-2',
-              userName: 'Armani',
+              userName: 'Mic 2',
             );
           case 3:
             return VoiceSeat(
               seatNumber: 3,
               status: SeatStatus.occupied,
               userId: 'user-3',
-              userName: 'Zarooh',
+              userName: 'Mic 3',
             );
           default:
             return VoiceSeat(seatNumber: seatNum);
         }
       }),
       members: const [
-        RoomMember(id: 'user-1', name: 'Ali', score: 2500, isHost: true),
-        RoomMember(id: 'user-2', name: 'Armani', score: 1800),
-        RoomMember(id: 'user-3', name: 'Zarooh', score: 1200),
-        RoomMember(id: 'user-4', name: 'Ahmed', score: 900),
-        RoomMember(id: 'user-5', name: 'Sara', score: 600),
+        RoomMember(id: 'user-1', name: 'Mic 1', score: 2500, isHost: true),
+        RoomMember(id: 'user-2', name: 'Mic 2', score: 1800),
+        RoomMember(id: 'user-3', name: 'Mic 3', score: 1200),
       ],
       messages: [
         ChatMessage(
