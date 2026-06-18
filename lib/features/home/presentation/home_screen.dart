@@ -133,6 +133,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
+          if (index == 0) context.go(AppRoutes.home);
+          if (index == 3) context.push(AppRoutes.profile);
         },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),

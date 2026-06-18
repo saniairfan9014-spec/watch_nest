@@ -10,4 +10,6 @@ class AppRoutes {
   static const String joinRoom = '/join-room';
   static const String room = '/room';
   static const String roomSettings = '/room/:id/settings';
+  static const String profile = '/profile';
+  static const String editProfile = '/edit-profile';
 }

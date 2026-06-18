@@ -45,6 +45,7 @@ dependencies:
   agora_rtc_engine: ^6.6.3
   youtube_player_iframe: ^6.0.2
   google_fonts: ^8.1.0
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

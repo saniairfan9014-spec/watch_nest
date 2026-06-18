@@ -8,6 +8,8 @@ import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/profile/presentation/edit_profile_screen.dart';
+import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/rooms/presentation/create_room_screen.dart';
 import '../../features/rooms/presentation/join_room_screen.dart';
 import '../../features/family_watch_room/presentation/family_watch_room_screen.dart';
@@ -77,6 +79,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.joinRoom,
         builder: (context, state) => const JoinRoomScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.editProfile,
+        builder: (context, state) {
+          final profile = state.extra as dynamic;
+          return EditProfileScreen(profile: profile);
+        },
       ),
       GoRoute(
         path: '/room/:id',

@@ -61,14 +61,14 @@ class AuthRepository {
     if (user == null) return;
 
     final profileResponse = await _supabaseClient
-        .from('profiles')
+        .from('profile')
         .select()
         .eq('id', user.id)
         .maybeSingle();
 
     if (profileResponse == null) {
       // Create new profile
-      await _supabaseClient.from('profiles').insert({
+      await _supabaseClient.from('profile').insert({
         'id': user.id,
         'username': user.userMetadata?['name'] ?? user.email?.split('@').first ?? 'User_${user.id.substring(0, 5)}',
         'avatar_url': user.userMetadata?['avatar_url'],

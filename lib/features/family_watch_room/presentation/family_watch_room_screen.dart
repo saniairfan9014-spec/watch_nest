@@ -108,7 +108,10 @@ class _FamilyWatchRoomScreenState
             final vm = ref.read(familyWatchRoomViewModelProvider.notifier);
             if (value == 'invite') vm.toggleInvitePanel();
             if (value == 'settings') vm.toggleSettingsPanel();
-            if (value == 'leave') vm.leaveRoom();
+            if (value == 'leave') {
+              vm.leaveRoom();
+              context.go('/home');
+            }
           },
           itemBuilder: (context) => [
             const PopupMenuItem(value: 'invite', child: Text('Invite')),
@@ -933,6 +936,7 @@ class _FamilyWatchRoomScreenState
                           style: TextStyle(color: Colors.red)),
                       onTap: () {
                         viewModel.leaveRoom();
+                        context.go('/home');
                       },
                     ),
                   ],
