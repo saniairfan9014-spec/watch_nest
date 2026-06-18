@@ -103,8 +103,32 @@ class AuthRepository {
     );
   }
 
-  Future<void> resetPassword(String email) async {
-    await _supabaseClient.auth.resetPasswordForEmail(email);
+  Future<void> sendOtp(String email) async {
+    await _supabaseClient.auth.signInWithOtp(email: email);
+  }
+
+  Future<void> verifyOtp(String email, String token) async {
+    await _supabaseClient.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.email,
+    );
+  }
+
+  Future<AuthResponse> signUpWithEmail(String email, String password, String fullName) async {
+    final response = await _supabaseClient.auth.signUp(
+      email: email,
+      password: password,
+      data: {'name': fullName},
+    );
+    await _checkAndCreateProfile(response.user);
+    return response;
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await _supabaseClient.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
   }
 
   Future<void> signOut() async {

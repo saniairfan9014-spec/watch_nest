@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../home/controllers/home_controller.dart';
 import 'create_room_viewmodel.dart';
 import 'room_type.dart';
 import 'room_privacy.dart';
@@ -27,7 +29,26 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final viewModel = ref.read(createRoomViewModelProvider.notifier);
-    await viewModel.createRoom();
+    try {
+      await viewModel.createRoom(
+        name: _roomNameController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      if (mounted) {
+        ref.invalidate(roomsProvider);
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override

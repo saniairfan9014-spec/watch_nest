@@ -59,7 +59,7 @@ class _RoomDetailsScreenState extends ConsumerState<RoomDetailsScreen>
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
             Text(
-              '${room.type.name.toUpperCase()} Mode • ${room.memberCount} Members',
+              '${room.roomType?.name.toUpperCase() ?? 'General'} Mode • ${room.currentMemberCount} Members',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
@@ -154,7 +154,7 @@ class _RoomDetailsScreenState extends ConsumerState<RoomDetailsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  state.room.currentMediaTitle ?? 'No media playing',
+                  'No media playing',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,

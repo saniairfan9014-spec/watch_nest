@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/room_model.dart';
 import '../../rooms/data/room_repository.dart';
 
-final publicRoomsProvider = FutureProvider.autoDispose<List<RoomModel>>((ref) {
-  return ref.watch(roomRepositoryProvider).fetchPublicRooms();
+final roomsProvider = FutureProvider.autoDispose<List<RoomModel>>((ref) {
+  return ref.watch(roomRepositoryProvider).fetchRooms();
 });
 
 class HomeState {
@@ -30,7 +30,7 @@ class HomeController extends Notifier<HomeState> {
   Future<void> refresh() async {
     state = state.copyWith(isRefreshing: true);
     try {
-      ref.invalidate(publicRoomsProvider);
+      ref.invalidate(roomsProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     } finally {

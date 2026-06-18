@@ -1,28 +1,29 @@
 import 'package:equatable/equatable.dart';
-
-enum RoomType { movie, music }
+import '../../features/rooms/presentation/room_type.dart';
 
 class RoomModel extends Equatable {
   final String id;
   final String name;
   final String hostId;
-  final RoomType type;
-  final bool isPublic;
-  final int memberCount;
-  final String? currentMediaTitle;
-  final String? thumbnailUrl;
+  final RoomType? roomType;
+  final bool isPrivate;
+  final String? password;
+  final String? inviteCode;
+  final int currentMemberCount;
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   const RoomModel({
     required this.id,
     required this.name,
     required this.hostId,
-    required this.type,
-    required this.isPublic,
-    required this.memberCount,
-    this.currentMediaTitle,
-    this.thumbnailUrl,
+    this.roomType,
+    this.isPrivate = false,
+    this.password,
+    this.inviteCode,
+    this.currentMemberCount = 0,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory RoomModel.fromJson(Map<String, dynamic> json) {
@@ -30,12 +31,18 @@ class RoomModel extends Equatable {
       id: json['id'] as String,
       name: json['name'] as String,
       hostId: json['host_id'] as String,
-      type: json['type'] == 'music' ? RoomType.music : RoomType.movie,
-      isPublic: json['is_public'] as bool? ?? true,
-      memberCount: json['member_count'] as int? ?? 0,
-      currentMediaTitle: json['current_media_title'] as String?,
-      thumbnailUrl: json['thumbnail_url'] as String?,
+      roomType: json['room_type'] != null
+          ? RoomType.values.firstWhere(
+              (e) => e.name == json['room_type'],
+              orElse: () => RoomType.family,
+            )
+          : RoomType.family,
+      isPrivate: json['is_private'] as bool? ?? false,
+      password: json['password'] as String?,
+      inviteCode: json['invite_code'] as String?,
+      currentMemberCount: json['current_member_count'] as int? ?? 0,
       createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 
@@ -43,12 +50,16 @@ class RoomModel extends Equatable {
         'id': id,
         'name': name,
         'host_id': hostId,
-        'type': type.name,
-        'is_public': isPublic,
-        'member_count': memberCount,
-        'current_media_title': currentMediaTitle,
-        'thumbnail_url': thumbnailUrl,
+        if (roomType != null)
+          'room_type': roomType!.name
+        else
+          'room_type': null,
+        'is_private': isPrivate,
+        'password': password,
+        'invite_code': inviteCode,
+        'current_member_count': currentMemberCount,
         'created_at': createdAt.toIso8601String(),
+        'updated_at': updatedAt.toIso8601String(),
       };
 
   @override
@@ -56,11 +67,12 @@ class RoomModel extends Equatable {
         id,
         name,
         hostId,
-        type,
-        isPublic,
-        memberCount,
-        currentMediaTitle,
-        thumbnailUrl,
+        roomType,
+        isPrivate,
+        password,
+        inviteCode,
+        currentMemberCount,
         createdAt,
+        updatedAt,
       ];
 }

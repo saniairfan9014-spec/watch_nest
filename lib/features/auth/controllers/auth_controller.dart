@@ -72,11 +72,44 @@ class AuthController extends Notifier<AsyncValue<void>> {
     }
   }
 
-  Future<void> resetPassword(String email) async {
+  Future<void> sendOtp(String email) async {
     state = const AsyncValue.loading();
 
     try {
-      await ref.read(authRepositoryProvider).resetPassword(email);
+      await ref.read(authRepositoryProvider).sendOtp(email);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> verifyOtp(String email, String token) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).verifyOtp(email, token);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> signUpWithEmail(String email, String password, String fullName) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).signUpWithEmail(email, password, fullName);
+      state = const AsyncValue.data(null);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    state = const AsyncValue.loading();
+
+    try {
+      await ref.read(authRepositoryProvider).updatePassword(newPassword);
       state = const AsyncValue.data(null);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);

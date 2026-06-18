@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../app/router/app_routes.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../core/models/room_model.dart';
+import '../../../rooms/presentation/room_type.dart';
 
 class RoomCard extends ConsumerStatefulWidget {
   final RoomModel room;
@@ -41,7 +41,7 @@ class _RoomCardState extends ConsumerState<RoomCard>
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
-    final isMovie = room.type == RoomType.movie;
+    final isMovie = room.roomType == RoomType.movie;
     final color = isMovie ? AppColors.primary : AppColors.accent;
 
     return GestureDetector(
@@ -87,7 +87,7 @@ class _RoomCardState extends ConsumerState<RoomCard>
                           color: color.withValues(alpha: 0.5),
                         ),
                       ),
-                      if (room.memberCount > 0)
+                      if (room.currentMemberCount > 0)
                         Positioned(
                           top: 12,
                           right: 12,
@@ -154,15 +154,6 @@ class _RoomCardState extends ConsumerState<RoomCard>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (room.currentMediaTitle != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        room.currentMediaTitle!,
-                        style: AppTextStyles.bodyMd,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -173,7 +164,7 @@ class _RoomCardState extends ConsumerState<RoomCard>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${room.memberCount} watching',
+                          '${room.currentMemberCount} watching',
                           style: AppTextStyles.bodySm,
                         ),
                       ],

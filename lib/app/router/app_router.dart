@@ -5,10 +5,13 @@ import '../../features/auth/controllers/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/onboarding_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
+import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/rooms/presentation/create_room_screen.dart';
 import '../../features/rooms/presentation/join_room_screen.dart';
-import '../../features/rooms/presentation/room_screen.dart';
+import '../../features/family_watch_room/presentation/family_watch_room_screen.dart';
+import '../../features/family_watch_room/settings/room_settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
 import 'app_routes.dart';
 
@@ -27,9 +30,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isOnLogin = location == AppRoutes.login;
       final isOnOnboarding = location == AppRoutes.onboarding;
       final isOnSignUp = location == AppRoutes.signUp;
+      final isOnForgotPassword = location == AppRoutes.forgotPassword;
+      final isOnResetPassword = location == AppRoutes.resetPassword;
 
-      if (!isAuthenticated && !isOnLogin && !isOnSplash && !isOnOnboarding && !isOnSignUp) return AppRoutes.onboarding;
-      if (isAuthenticated && (isOnLogin || isOnSplash || isOnOnboarding || isOnSignUp)) return AppRoutes.home;
+      if (!isAuthenticated && !isOnLogin && !isOnSplash && !isOnOnboarding && !isOnSignUp && !isOnForgotPassword && !isOnResetPassword) return AppRoutes.onboarding;
+      if (isAuthenticated && (isOnLogin || isOnSplash || isOnOnboarding || isOnSignUp || isOnForgotPassword || isOnResetPassword)) return AppRoutes.home;
 
       return null;
     },
@@ -45,6 +50,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return ResetPasswordScreen(email: email);
+        },
       ),
       GoRoute(
         path: AppRoutes.home,
@@ -64,10 +80,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/room/:id',
-        builder: (context, state) {
-          final roomId = state.pathParameters['id']!;
-          return RoomScreen(roomId: roomId);
-        },
+        builder: (context, state) => const FamilyWatchRoomScreen(),
+        routes: [
+          GoRoute(
+            path: 'settings',
+            builder: (context, state) {
+              final roomId = state.pathParameters['id']!;
+              return RoomSettingsScreen(roomId: roomId);
+            },
+          ),
+        ],
       ),
     ],
   );

@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../app/router/app_routes.dart';
+import '../controllers/home_controller.dart';
+import 'widgets/room_card.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedIndex = 0;
-
-  final List<Map<String, dynamic>> _rooms = [
-    {'name': 'Family Movie Night', 'members': 6},
-    {'name': 'Kids Cartoon Time', 'members': 4},
-    {'name': 'Music & Chill', 'members': 5},
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final roomsAsync = ref.watch(roomsProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -60,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () => context.push(AppRoutes.createRoom),
                         child: const Text('Create Room'),
                       ),
                     ],
@@ -68,46 +69,59 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Your Rooms',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('View All'),
-                  ),
-                ],
+              const Text(
+                'Your Rooms',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _rooms.length,
-                itemBuilder: (context, index) {
-                  final room = _rooms[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey.shade200,
-                      child: Text(
-                        (room['name'] as String)[0],
-                        style: TextStyle(color: Colors.grey.shade600),
+              roomsAsync.when(
+                data: (rooms) {
+                  if (rooms.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'No rooms yet. Create one!',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ),
+                    );
+                  }
+                  return SizedBox(
+                    height: 240,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: rooms.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) => SizedBox(
+                        width: 200,
+                        child: RoomCard(room: rooms[index]),
                       ),
                     ),
-                    title: Text(room['name'] as String),
-                    subtitle: Text('${room['members']} Members'),
-                    trailing: const Icon(Icons.more_vert),
                   );
                 },
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'Failed to load rooms: $e',
+                      style: TextStyle(color: Colors.red.shade400),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => context.push(AppRoutes.createRoom),
                   child: const Text('+ Create Room'),
                 ),
               ),

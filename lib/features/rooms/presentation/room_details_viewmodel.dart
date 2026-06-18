@@ -4,6 +4,7 @@ import '../../../core/models/room_model.dart';
 import '../../../core/models/member_model.dart';
 import '../../../core/models/queue_item_model.dart';
 import '../../../core/models/chat_message_model.dart';
+import 'room_type.dart';
 
 class RoomDetailsState {
   final RoomModel room;
@@ -59,11 +60,11 @@ class RoomDetailsViewModel extends Notifier<RoomDetailsState> {
         id: 'room-1',
         name: 'Family Movie Night',
         hostId: user?.id ?? 'host-1',
-        type: RoomType.movie,
-        isPublic: true,
-        memberCount: 3,
-        currentMediaTitle: 'Spider-Man: No Way Home',
+        roomType: RoomType.movie,
+        isPrivate: false,
+        currentMemberCount: 3,
         createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       ),
       queue: [
         const QueueItem(position: 1, title: 'Avengers: Endgame', addedBy: 'Sara'),

@@ -22,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
 
   @override
@@ -97,9 +98,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       const SizedBox(height: 20),
                       _buildHeadline(),
                       const SizedBox(height: 32),
-                      _buildEmailField(isLoading),
-                      const SizedBox(height: 16),
-                      _buildPasswordField(isLoading),
+                      Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            _buildEmailField(isLoading),
+                            const SizedBox(height: 16),
+                            _buildPasswordField(isLoading),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       _buildForgotPassword(),
                       const SizedBox(height: 24),
@@ -203,7 +211,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Widget _buildEmailField(bool isLoading) {
-    return TextField(
+    return TextFormField(
       controller: _emailController,
       enabled: !isLoading,
       keyboardType: TextInputType.emailAddress,
@@ -230,11 +238,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         labelStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
         hintStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
       ),
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) return 'Enter your email';
+        if (!value.contains('@') || !value.contains('.')) return 'Enter a valid email';
+        return null;
+      },
     );
   }
 
   Widget _buildPasswordField(bool isLoading) {
-    return TextField(
+    return TextFormField(
       controller: _passwordController,
       enabled: !isLoading,
       obscureText: _obscurePassword,
@@ -267,6 +280,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         labelStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
         hintStyle: AppTextStyles.bodySm.copyWith(color: AppColors.textMuted),
       ),
+      validator: (value) {
+        if (value == null || value.isEmpty) return 'Enter your password';
+        return null;
+      },
     );
   }
 
@@ -274,21 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton(
-        onPressed: () {
-          final email = _emailController.text.trim();
-          if (email.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Enter your email first'),
-                backgroundColor: AppColors.warning,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            );
-            return;
-          }
-          ref.read(authControllerProvider.notifier).resetPassword(email);
-        },
+          onPressed: () => context.push(AppRoutes.forgotPassword),
         child: Text(
           'Forgot Password?',
           style: AppTextStyles.bodySm.copyWith(color: AppColors.primary),
@@ -305,10 +308,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         onPressed: isLoading
             ? null
             : () {
-                final email = _emailController.text.trim();
-                final password = _passwordController.text;
-                if (email.isEmpty || password.isEmpty) return;
-                ref.read(authControllerProvider.notifier).signInWithEmail(email, password);
+                if (!_formKey.currentState!.validate()) return;
+                ref.read(authControllerProvider.notifier).signInWithEmail(
+                  _emailController.text.trim(),
+                  _passwordController.text,
+                );
               },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'room_type.dart';
 import 'room_privacy.dart';
+import '../data/room_repository.dart';
 
 class CreateRoomState {
   final RoomType selectedType;
@@ -9,7 +11,7 @@ class CreateRoomState {
   final bool isLoading;
 
   const CreateRoomState({
-    this.selectedType = RoomType.general,
+    this.selectedType = RoomType.family,
     this.selectedPrivacy = RoomPrivacy.public,
     this.obscurePassword = true,
     this.isLoading = false,
@@ -46,12 +48,23 @@ class CreateRoomViewModel extends Notifier<CreateRoomState> {
     state = state.copyWith(obscurePassword: !state.obscurePassword);
   }
 
-  Future<void> createRoom() async {
+  Future<void> createRoom({
+    required String name,
+    required String password,
+  }) async {
     state = state.copyWith(isLoading: true);
 
     try {
-      // TODO: Implement room creation logic
-      await Future.delayed(const Duration(seconds: 1));
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      await ref.read(roomRepositoryProvider).createRoom(
+        name: name,
+        hostId: user.id,
+        roomType: state.selectedType,
+        isPrivate: state.selectedPrivacy == RoomPrivacy.private,
+        password: state.selectedPrivacy == RoomPrivacy.private ? password : null,
+      );
     } catch (e) {
       rethrow;
     } finally {
