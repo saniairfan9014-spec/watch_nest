@@ -15,6 +15,7 @@ import '../../features/rooms/presentation/join_room_screen.dart';
 import '../../features/family_watch_room/presentation/family_watch_room_screen.dart';
 import '../../features/family_watch_room/settings/room_settings_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import 'app_routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -90,6 +91,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           final profile = state.extra as dynamic;
           return EditProfileScreen(profile: profile);
         },
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/room/:id',

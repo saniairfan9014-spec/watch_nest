@@ -8,12 +8,16 @@ import '../models/chat_message_model.dart';
 import '../models/announcement_model.dart';
 import '../models/room_activity_model.dart';
 import '../models/family_watch_room_model.dart';
+import '../../profile/controllers/profile_controller.dart';
+import '../../profile/data/profile_model.dart';
 
 class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
   @override
   FamilyWatchRoomState build() {
+    final profile = ref.watch(currentUserProfileProvider).value;
+
     return FamilyWatchRoomState(
-      room: _createSampleRoom(),
+      room: _createSampleRoom(profile),
       friends: const [
         RoomMember(id: 'user-6', name: 'Hassan', score: 2100),
         RoomMember(id: 'user-7', name: 'Fatima', score: 1900),
@@ -32,7 +36,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     );
   }
 
-  FamilyWatchRoom _createSampleRoom() {
+  FamilyWatchRoom _createSampleRoom(ProfileModel? profile) {
     return FamilyWatchRoom(
       id: 'room-1',
       name: 'Family Movie Night',
@@ -74,55 +78,18 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
             return VoiceSeat(seatNumber: seatNum);
         }
       }),
-      members: const [
-        RoomMember(id: 'user-1', name: 'Mic 1', score: 2500, isHost: true),
-        RoomMember(id: 'user-2', name: 'Mic 2', score: 1800),
-        RoomMember(id: 'user-3', name: 'Mic 3', score: 1200),
-      ],
-      messages: [
-        ChatMessage(
-          id: 'msg-1',
-          senderId: 'user-2',
-          senderName: 'Armani',
-          text: "Let's start in few mins 🎁",
-          timestamp: DateTime(2026, 6, 18, 11, 30),
-        ),
-        ChatMessage(
-          id: 'msg-2',
-          senderId: 'user-3',
-          senderName: 'Zarooh',
-          text: "Can't wait! 😍",
-          timestamp: DateTime(2026, 6, 18, 11, 31),
-        ),
-        ChatMessage(
-          id: 'msg-3',
-          senderId: 'user-1',
-          senderName: 'Ali',
-          text: 'Get some snacks and enjoy! 😊',
-          isHost: true,
-          timestamp: DateTime(2026, 6, 18, 11, 32),
-        ),
-      ],
-      activities: [
-        RoomActivity(
-          id: 'act-1',
-          userName: 'Zarooh',
-          type: ActivityType.like,
-          timestamp: DateTime(2026, 6, 18, 11, 33),
-        ),
-        RoomActivity(
-          id: 'act-2',
-          userName: 'Ahmed',
-          type: ActivityType.join,
-          timestamp: DateTime(2026, 6, 18, 11, 34),
-        ),
-        RoomActivity(
-          id: 'act-3',
-          userName: 'Sara',
-          type: ActivityType.leave,
-          timestamp: DateTime(2026, 6, 18, 11, 35),
-        ),
-      ],
+      members: profile != null
+          ? [
+              RoomMember(
+                id: profile.id,
+                name: profile.username,
+                avatarUrl: profile.avatarUrl,
+                isHost: true,
+              )
+            ]
+          : const [],
+      messages: const [],
+      activities: const [],
     );
   }
 
@@ -210,10 +177,15 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     final text = state.chatInput.trim();
     if (text.isEmpty) return;
 
+    final profile = ref.read(currentUserProfileProvider).value;
+    final senderName = profile?.username ?? 'Ali';
+    final senderAvatarUrl = profile?.avatarUrl;
+
     final message = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderId: state.room.currentUserId,
-      senderName: 'Ali',
+      senderName: senderName,
+      senderAvatarUrl: senderAvatarUrl,
       text: text,
       timestamp: DateTime.now(),
       isHost: state.room.isHost,
@@ -233,10 +205,15 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     if (index == -1) return;
     if (seats[index].status != SeatStatus.empty) return;
 
+    final profile = ref.read(currentUserProfileProvider).value;
+    final userName = profile?.username ?? 'User';
+    final avatarUrl = profile?.avatarUrl;
+
     seats[index] = seats[index].copyWith(
       status: SeatStatus.occupied,
       userId: state.room.currentUserId,
-      userName: 'Ali',
+      userName: userName,
+      avatarUrl: avatarUrl,
     );
 
     state = state.copyWith(seats: seats);

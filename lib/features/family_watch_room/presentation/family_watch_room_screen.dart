@@ -96,12 +96,25 @@ class _FamilyWatchRoomScreenState
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.people_outline),
-          tooltip: 'Members (${room.members.length})',
-          onPressed: () => ref
+        InkWell(
+          onTap: () => ref
               .read(familyWatchRoomViewModelProvider.notifier)
               .toggleMembersPanel(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.people_outline, size: 20),
+                const SizedBox(height: 2),
+                Text(
+                  '${room.members.length}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
         ),
         PopupMenuButton<String>(
           onSelected: (value) {
@@ -216,16 +229,17 @@ class _FamilyWatchRoomScreenState
                   : isLocked
                       ? theme.seatLockedColor
                       : theme.primarySwatch.shade100,
-              child: isOccupied
+              backgroundImage: (isOccupied && seat.avatarUrl != null) ? NetworkImage(seat.avatarUrl!) : null,
+              child: isOccupied && seat.avatarUrl == null
                   ? Text(
-                      (seat.userName ?? '?')[0],
+                      (seat.userName ?? '?')[0].toUpperCase(),
                       style: TextStyle(fontSize: 13, color: theme.primarySwatch.shade700),
                     )
-                  : Icon(
+                  : !isOccupied ? Icon(
                       isLocked ? Icons.lock : Icons.person_add,
                       size: 16,
                       color: theme.primarySwatch.shade400,
-                    ),
+                    ) : null,
             ),
             const SizedBox(height: 4),
             if (isOccupied)
@@ -368,13 +382,14 @@ class _FamilyWatchRoomScreenState
                       CircleAvatar(
                         radius: 14,
                         backgroundColor: theme.seatOccupiedColor,
-                        child: Text(
-                          msg.senderName[0],
+                        backgroundImage: msg.senderAvatarUrl != null ? NetworkImage(msg.senderAvatarUrl!) : null,
+                        child: msg.senderAvatarUrl == null ? Text(
+                          msg.senderName[0].toUpperCase(),
                           style: TextStyle(
                             fontSize: 12,
                             color: theme.primarySwatch.shade700,
                           ),
-                        ),
+                        ) : null,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -755,10 +770,11 @@ class _FamilyWatchRoomScreenState
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundColor: Colors.grey.shade300,
-                        child: Text(
-                          member.name[0],
+                        backgroundImage: member.avatarUrl != null ? NetworkImage(member.avatarUrl!) : null,
+                        child: member.avatarUrl == null ? Text(
+                          member.name[0].toUpperCase(),
                           style: TextStyle(color: Colors.grey.shade700),
-                        ),
+                        ) : null,
                       ),
                       title: Row(
                         children: [

@@ -7,6 +7,7 @@ class VoiceSeat extends Equatable {
   final SeatStatus status;
   final String? userId;
   final String? userName;
+  final String? avatarUrl;
   final bool isMuted;
   final bool isHost;
 
@@ -15,6 +16,7 @@ class VoiceSeat extends Equatable {
     this.status = SeatStatus.empty,
     this.userId,
     this.userName,
+    this.avatarUrl,
     this.isMuted = false,
     this.isHost = false,
   });
@@ -24,6 +26,7 @@ class VoiceSeat extends Equatable {
     SeatStatus? status,
     String? userId,
     String? userName,
+    String? avatarUrl,
     bool? isMuted,
     bool? isHost,
   }) {
@@ -32,11 +35,12 @@ class VoiceSeat extends Equatable {
       status: status ?? this.status,
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       isMuted: isMuted ?? this.isMuted,
       isHost: isHost ?? this.isHost,
     );
   }
 
   @override
-  List<Object?> get props => [seatNumber, status, userId, userName, isMuted, isHost];
+  List<Object?> get props => [seatNumber, status, userId, userName, avatarUrl, isMuted, isHost];
 }

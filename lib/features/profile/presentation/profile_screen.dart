@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../controllers/profile_controller.dart';
 import '../data/profile_model.dart';
 import '../../auth/controllers/auth_controller.dart';
+import '../../../app/router/app_routes.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -24,6 +25,10 @@ class ProfileScreen extends ConsumerWidget {
                 context.push('/edit-profile', extra: profile);
               }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.push(AppRoutes.settings),
           ),
         ],
       ),

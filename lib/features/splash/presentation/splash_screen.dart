@@ -47,66 +47,47 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.bgGradient),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: ScaleTransition(
-              scale: _scaleAnim,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      backgroundColor: const Color(0xFF1A0E05),
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: Container(
+            color: const Color(0xFF1A0E05),
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  // Logo orb
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: AppColors.primaryGradient,
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.45),
-                          blurRadius: 40,
-                          spreadRadius: 8,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.play_circle_rounded,
-                      color: Colors.white,
-                      size: 52,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Watch Nest',
-                    style: AppTextStyles.displayMd.copyWith(
-                      foreground: Paint()
-                        ..shader = const LinearGradient(
-                          colors: [AppColors.primaryLight, AppColors.accent],
-                        ).createShader(
-                          const Rect.fromLTWH(0, 0, 240, 50),
-                        ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Watch Together, Feel Together',
-                    style: AppTextStyles.bodyMd.copyWith(
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 56),
+                  // 1. Frame / Room background
                   SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary.withValues(alpha: 0.7),
-                      ),
+                    width: double.infinity,
+                    child: Image.asset(
+                      'assets/images/splash/frame .png',
+                      fit: BoxFit.fitWidth,
+                    ),
+                  ),
+                  // 2. Family sitting on couch
+                  SizedBox(
+                    width: double.infinity,
+                    child: Image.asset(
+                      'assets/images/splash/family.png',
+                      fit: BoxFit.fitWidth,
+                    ),
+                  ),
+                  // 3. Logo on TV screen
+                  SizedBox(
+                    width: double.infinity,
+                    child: Image.asset(
+                      'assets/images/splash/logo2.png',
+                      fit: BoxFit.fitWidth,
+                    ),
+                  ),
+                  // 4. Popcorn in front
+                  SizedBox(
+                    width: double.infinity,
+                    child: Image.asset(
+                      'assets/images/splash/popcorn.png',
+                      fit: BoxFit.fitWidth,
                     ),
                   ),
                 ],
