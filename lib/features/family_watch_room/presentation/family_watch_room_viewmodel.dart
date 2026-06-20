@@ -274,6 +274,14 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         }
       },
     );
+
+    // Listen for chat messages (broadcast)
+    _channel!.onBroadcast(
+      event: 'chat_message',
+      callback: (payload) {
+        _handleIncomingChatMessage(payload);
+      },
+    );
     
     _channel!.subscribe();
   }
@@ -304,6 +312,30 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     final mUserId = data['user_id'] as String? ?? '';
     state = state.copyWith(
       members: state.room.members.where((m) => m.id != mUserId).toList(),
+    );
+  }
+
+  void _handleIncomingChatMessage(Map<String, dynamic> payload) {
+    // For broadcasts, the data might be wrapped in 'payload', or it might be the top-level map
+    final payloadData = payload['payload'] is Map ? payload['payload'] : payload;
+    
+    final message = ChatMessage(
+      id: payloadData['id'] as String? ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      senderId: payloadData['sender_id'] as String? ?? '',
+      senderName: payloadData['sender_name'] as String? ?? 'User',
+      senderAvatarUrl: payloadData['sender_avatar_url'] as String?,
+      text: payloadData['text'] as String? ?? '',
+      timestamp: payloadData['timestamp'] != null 
+          ? DateTime.parse(payloadData['timestamp']) 
+          : DateTime.now(),
+      isHost: payloadData['is_host'] as bool? ?? false,
+    );
+
+    // Prevent duplicates if we sent it
+    if (message.senderId == state.room.currentUserId) return;
+
+    state = state.copyWith(
+      messages: [...state.room.messages, message],
     );
   }
 
@@ -459,12 +491,16 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     state = state.copyWith(chatInput: value);
   }
 
-  void sendMessage() {
+  Future<void> sendMessage() async {
     final text = state.chatInput.trim();
     if (text.isEmpty) return;
 
-    final profile = ref.read(currentUserProfileProvider).value;
-    final senderName = profile?.username ?? 'Ali';
+    ProfileModel? profile;
+    try {
+      profile = await ref.read(currentUserProfileProvider.future);
+    } catch (_) {}
+
+    final senderName = profile?.username ?? 'User';
     final senderAvatarUrl = profile?.avatarUrl;
 
     final message = ChatMessage(
@@ -481,6 +517,23 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       messages: [...state.room.messages, message],
       chatInput: '',
     );
+
+    if (!state.room.id.startsWith('room-') && _channel != null) {
+      try {
+        await _channel!.sendBroadcastMessage(
+          event: 'chat_message',
+          payload: {
+            'id': message.id,
+            'sender_id': message.senderId,
+            'sender_name': message.senderName,
+            'sender_avatar_url': message.senderAvatarUrl,
+            'text': message.text,
+            'timestamp': message.timestamp.toIso8601String(),
+            'is_host': message.isHost,
+          },
+        );
+      } catch (_) {}
+    }
   }
 
   // --- Seats ---

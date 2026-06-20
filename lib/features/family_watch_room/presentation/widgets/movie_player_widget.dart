@@ -148,23 +148,26 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
   Widget build(BuildContext context) {
     final roomState = ref.watch(familyWatchRoomViewModelProvider).room;
     
-    // Member synchronization
-    if (!roomState.isHost) {
-      if (roomState.currentVideoId != null && roomState.currentVideoId != _lastVideoId) {
-        _lastVideoId = roomState.currentVideoId;
-        _controller.loadVideoById(videoId: roomState.currentVideoId!);
-        _controller.seekTo(seconds: roomState.currentPosition.toDouble(), allowSeekAhead: true);
-      }
-      
-      if (roomState.isPlaying != _lastIsPlaying) {
-        _lastIsPlaying = roomState.isPlaying;
-        if (roomState.isPlaying) {
-          _controller.playVideo();
-        } else {
-          _controller.pauseVideo();
+    // Listen for member synchronization
+    ref.listen(familyWatchRoomViewModelProvider, (previous, next) {
+      final roomState = next.room;
+      if (!roomState.isHost) {
+        if (roomState.currentVideoId != null && roomState.currentVideoId != _lastVideoId) {
+          _lastVideoId = roomState.currentVideoId;
+          _controller.loadVideoById(videoId: roomState.currentVideoId!);
+          _controller.seekTo(seconds: roomState.currentPosition.toDouble(), allowSeekAhead: true);
+        }
+        
+        if (roomState.isPlaying != _lastIsPlaying) {
+          _lastIsPlaying = roomState.isPlaying;
+          if (roomState.isPlaying) {
+            _controller.playVideo();
+          } else {
+            _controller.pauseVideo();
+          }
         }
       }
-    }
+    });
 
     return Column(
       children: [
@@ -220,27 +223,29 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
               ),
             ],
           ),
-          child: roomState.currentVideoId == null && roomState.isHost
-              ? const Center(
-                  child: Text(
-                    'Load a video to start watching',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              : roomState.currentVideoId == null
-                  ? const Center(
-                      child: Text(
-                        'Waiting for host to load a video...',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    )
-                  : AbsorbPointer(
-                      absorbing: !roomState.isHost,
-                      child: YoutubePlayer(
-                        controller: _controller,
-                        backgroundColor: Colors.black,
-                      ),
+          child: Stack(
+            children: [
+              AbsorbPointer(
+                absorbing: !roomState.isHost,
+                child: YoutubePlayer(
+                  controller: _controller,
+                  backgroundColor: Colors.black,
+                ),
+              ),
+              if (roomState.currentVideoId == null)
+                Container(
+                  color: Colors.black,
+                  child: Center(
+                    child: Text(
+                      roomState.isHost
+                          ? 'Load a video to start watching'
+                          : 'Waiting for host to load a video...',
+                      style: const TextStyle(color: Colors.grey),
                     ),
+                  ),
+                ),
+            ],
+          ),
         ),
         
         // Custom Controls for Host
