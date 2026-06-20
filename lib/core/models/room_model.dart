@@ -13,6 +13,7 @@ class RoomModel extends Equatable {
   final String? currentVideoId;
   final int currentPosition;
   final bool isPlaying;
+  final bool micLocked;
   final DateTime? videoUpdatedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -29,6 +30,7 @@ class RoomModel extends Equatable {
     this.currentVideoId,
     this.currentPosition = 0,
     this.isPlaying = false,
+    this.micLocked = false,
     this.videoUpdatedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -52,6 +54,7 @@ class RoomModel extends Equatable {
       currentVideoId: json['current_video_id'] as String?,
       currentPosition: json['current_position'] as int? ?? 0,
       isPlaying: json['is_playing'] as bool? ?? false,
+      micLocked: json['mic_locked'] as bool? ?? false,
       videoUpdatedAt: json['video_updated_at'] != null 
           ? DateTime.parse(json['video_updated_at'] as String) 
           : null,
@@ -75,6 +78,7 @@ class RoomModel extends Equatable {
         'current_video_id': currentVideoId,
         'current_position': currentPosition,
         'is_playing': isPlaying,
+        'mic_locked': micLocked,
         if (videoUpdatedAt != null) 'video_updated_at': videoUpdatedAt!.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -93,6 +97,7 @@ class RoomModel extends Equatable {
         currentVideoId,
         currentPosition,
         isPlaying,
+        micLocked,
         videoUpdatedAt,
         createdAt,
         updatedAt,

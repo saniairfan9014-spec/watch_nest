@@ -11,7 +11,9 @@ import '../../rooms/presentation/room_type.dart';
 import 'widgets/movie_player_widget.dart';
 
 class FamilyWatchRoomScreen extends ConsumerStatefulWidget {
-  const FamilyWatchRoomScreen({super.key});
+  final String roomId;
+
+  const FamilyWatchRoomScreen({super.key, required this.roomId});
 
   @override
   ConsumerState<FamilyWatchRoomScreen> createState() =>
@@ -25,6 +27,14 @@ class _FamilyWatchRoomScreenState
   final _announcementController = TextEditingController();
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(familyWatchRoomViewModelProvider.notifier).loadRoom(widget.roomId);
+    });
+  }
 
   @override
   void dispose() {
@@ -42,6 +52,13 @@ class _FamilyWatchRoomScreenState
   Widget build(BuildContext context) {
     final state = ref.watch(familyWatchRoomViewModelProvider);
     final viewModel = ref.read(familyWatchRoomViewModelProvider.notifier);
+
+    if (state.isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Colors.amber)),
+      );
+    }
     final theme = _themeManager.getConfig(state.room.roomType);
 
     if (state.isEditingAnnouncement &&
@@ -51,8 +68,13 @@ class _FamilyWatchRoomScreenState
 
     final room = state.room;
 
-    return Scaffold(
-      appBar: _buildAppBar(room, theme),
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        ref.read(familyWatchRoomViewModelProvider.notifier).leaveRoom();
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(room, theme),
       body: Stack(
         children: [
           SafeArea(
@@ -208,7 +230,6 @@ class _FamilyWatchRoomScreenState
     return AppBar(
       backgroundColor: theme.primarySwatch,
       foregroundColor: Colors.white,
-      automaticallyImplyLeading: false,
       title: Text(
         room.name,
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
@@ -234,6 +255,14 @@ class _FamilyWatchRoomScreenState
             ),
           ),
         ),
+        if (room.isHost)
+          IconButton(
+            icon: Icon(room.micLocked ? Icons.lock : Icons.lock_open),
+            onPressed: () {
+              ref.read(familyWatchRoomViewModelProvider.notifier).lockAllSeats(!room.micLocked);
+            },
+            tooltip: room.micLocked ? 'Unlock Mics' : 'Lock Mics',
+          ),
         PopupMenuButton<String>(
           onSelected: (value) {
             final vm = ref.read(familyWatchRoomViewModelProvider.notifier);
@@ -282,6 +311,7 @@ class _FamilyWatchRoomScreenState
             return _buildSeatCard(
               state.room.seats[index],
               state.room.isHost,
+              state.room.currentUserId,
               viewModel,
               theme,
             );
@@ -291,7 +321,7 @@ class _FamilyWatchRoomScreenState
     );
   }
 
-  Widget _buildSeatCard(VoiceSeat seat, bool isHost, viewModel, RoomThemeConfig theme) {
+  Widget _buildSeatCard(VoiceSeat seat, bool isHost, String currentUserId, viewModel, RoomThemeConfig theme) {
     final isOccupied = seat.status == SeatStatus.occupied;
     final isEmpty = seat.status == SeatStatus.empty;
     final isLocked = seat.status == SeatStatus.locked;
@@ -301,7 +331,9 @@ class _FamilyWatchRoomScreenState
         if (isEmpty) {
           viewModel.joinSeat(seat.seatNumber);
         } else if (isOccupied) {
-          if (isHost) {
+          if (seat.userId == currentUserId) {
+            viewModel.leaveSeat(seat.seatNumber);
+          } else if (isHost) {
             viewModel.toggleMuteUser(seat.seatNumber);
           }
         } else if (isLocked && isHost) {
@@ -905,6 +937,28 @@ class _FamilyWatchRoomScreenState
                         ],
                       ),
                       subtitle: Text('Score: ${member.score}'),
+                      trailing: (state.room.isHost && member.id != state.room.currentUserId)
+                          ? PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert),
+                              onSelected: (value) {
+                                if (value == 'invite') {
+                                  viewModel.inviteToMic(member.id);
+                                } else if (value == 'transfer') {
+                                  viewModel.transferHost(member.id);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'invite',
+                                  child: Text('Invite to Mic'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'transfer',
+                                  child: Text('Transfer Host'),
+                                ),
+                              ],
+                            )
+                          : null,
                     );
                   },
                 ),

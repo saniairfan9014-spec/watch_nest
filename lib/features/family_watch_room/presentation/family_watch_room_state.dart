@@ -7,6 +7,7 @@ import '../models/room_activity_model.dart';
 
 class FamilyWatchRoomState {
   final FamilyWatchRoom room;
+  final bool isLoading;
   final bool isMuted;
   final String chatInput;
   final bool showMembersPanel;
@@ -23,6 +24,7 @@ class FamilyWatchRoomState {
 
   const FamilyWatchRoomState({
     required this.room,
+    this.isLoading = true,
     this.isMuted = false,
     this.chatInput = '',
     this.showMembersPanel = false,
@@ -40,6 +42,7 @@ class FamilyWatchRoomState {
 
   FamilyWatchRoomState copyWith({
     FamilyWatchRoom? room,
+    bool? isLoading,
     bool? isMuted,
     String? chatInput,
     bool? showMembersPanel,
@@ -58,10 +61,11 @@ class FamilyWatchRoomState {
     List<ChatMessage>? messages,
     List<RoomActivity>? activities,
     Announcement? announcement,
+    bool? micLocked,
   }) {
     var updatedRoom = room ?? this.room;
     if (seats != null || members != null || messages != null ||
-        activities != null || announcement != null) {
+        activities != null || announcement != null || micLocked != null) {
       updatedRoom = FamilyWatchRoom(
         id: updatedRoom.id,
         name: updatedRoom.name,
@@ -78,11 +82,13 @@ class FamilyWatchRoomState {
         currentVideoId: updatedRoom.currentVideoId,
         currentPosition: updatedRoom.currentPosition,
         isPlaying: updatedRoom.isPlaying,
+        micLocked: micLocked ?? updatedRoom.micLocked,
         videoUpdatedAt: updatedRoom.videoUpdatedAt,
       );
     }
     return FamilyWatchRoomState(
       room: updatedRoom,
+      isLoading: isLoading ?? this.isLoading,
       isMuted: isMuted ?? this.isMuted,
       chatInput: chatInput ?? this.chatInput,
       showMembersPanel: showMembersPanel ?? this.showMembersPanel,

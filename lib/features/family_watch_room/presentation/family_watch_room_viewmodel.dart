@@ -17,89 +17,160 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
 
   @override
   FamilyWatchRoomState build() {
-    final profile = ref.watch(currentUserProfileProvider).value;
-
     ref.onDispose(() {
       _channel?.unsubscribe();
     });
 
-    _initRealtime('room-1'); // Default to room-1 for now, in a real app this would be passed in
+    final profile = ref.read(currentUserProfileProvider).value;
+    final userId = profile?.id ?? '';
 
     return FamilyWatchRoomState(
-      room: _createSampleRoom(profile),
-      friends: const [
-        RoomMember(id: 'user-6', name: 'Hassan', score: 2100),
-        RoomMember(id: 'user-7', name: 'Fatima', score: 1900),
-        RoomMember(id: 'user-8', name: 'Omar', score: 1600),
-        RoomMember(id: 'user-9', name: 'Aisha', score: 1400),
-      ],
-      friendRequests: const [
-        RoomMember(id: 'user-10', name: 'Bilal', score: 800),
-        RoomMember(id: 'user-11', name: 'Zainab', score: 700),
-      ],
-      onlineFriends: const [
-        RoomMember(id: 'user-6', name: 'Hassan', score: 2100),
-        RoomMember(id: 'user-8', name: 'Omar', score: 1600),
-      ],
-      followedUserIds: {'user-2', 'user-6'},
+      isLoading: true,
+      room: FamilyWatchRoom(
+        id: '',
+        name: '',
+        roomId: '',
+        hostId: '',
+        currentUserId: userId,
+        announcement: Announcement(text: '', updatedAt: DateTime.now()),
+      ),
     );
   }
 
-  FamilyWatchRoom _createSampleRoom(ProfileModel? profile) {
-    return FamilyWatchRoom(
-      id: 'room-1',
-      name: 'General Room',
-      roomId: '25163166097',
-      points: 148600,
-      hostId: 'user-1',
-      currentUserId: 'user-1',
-      roomType: RoomType.general,
-      announcement: Announcement(
-        text: 'The host didn\'t add anything yet',
-        updatedAt: DateTime(2026, 6, 18),
-      ),
-      seats: List.generate(10, (i) {
+  Future<void> loadRoom(String roomId) async {
+    try {
+      final client = ref.read(supabaseClientProvider);
+      
+      // Fetch room data
+      final roomResponse = await client.from('rooms').select().eq('id', roomId).maybeSingle();
+      if (roomResponse == null) return;
+
+      // Wait for profile to load so we have the correct userId and name
+      ProfileModel? profile;
+      try {
+        profile = await ref.read(currentUserProfileProvider.future);
+      } catch (_) {}
+      
+      final userId = profile?.id ?? client.auth.currentUser?.id ?? '';
+      final userName = profile?.username ?? 'User';
+      final avatarUrl = profile?.avatarUrl;
+
+      final hostId = roomResponse['host_id'] as String;
+      final roomTypeStr = roomResponse['room_type'] as String?;
+      RoomType type = RoomType.general;
+      if (roomTypeStr != null) {
+        type = RoomType.values.firstWhere((e) => e.name == roomTypeStr, orElse: () => RoomType.general);
+      }
+
+      // Register current user in room_members (upsert so no duplicates)
+      if (userId.isNotEmpty) {
+        try {
+          await client.from('room_members').upsert({
+            'room_id': roomId,
+            'user_id': userId,
+            'user_name': userName,
+            'avatar_url': avatarUrl,
+            'is_host': userId == hostId,
+            'joined_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'room_id,user_id');
+        } catch (_) {}
+      }
+
+      // Fetch all seats
+      final seatsResponse = await client.from('room_seats').select().eq('room_id', roomId);
+      
+      final List<VoiceSeat> seats = List.generate(10, (i) {
         final seatNum = i + 1;
-        switch (seatNum) {
-          case 1:
-            return VoiceSeat(
-              seatNumber: 1,
-              status: SeatStatus.occupied,
-              userId: 'user-1',
-              userName: 'Mic 1',
-              isHost: true,
-            );
-          case 2:
-            return VoiceSeat(
-              seatNumber: 2,
-              status: SeatStatus.occupied,
-              userId: 'user-2',
-              userName: 'Mic 2',
-            );
-          case 3:
-            return VoiceSeat(
-              seatNumber: 3,
-              status: SeatStatus.occupied,
-              userId: 'user-3',
-              userName: 'Mic 3',
-            );
-          default:
-            return VoiceSeat(seatNumber: seatNum);
+        final seatData = seatsResponse.cast<Map<String, dynamic>>().firstWhere(
+          (s) => s['seat_number'] == seatNum, 
+          orElse: () => <String, dynamic>{},
+        );
+
+        if (seatData.isNotEmpty) {
+          final sUserId = seatData['user_id'] as String?;
+          final isLocked = seatData['is_locked'] as bool? ?? false;
+          
+          SeatStatus status = SeatStatus.empty;
+          if (sUserId != null) status = SeatStatus.occupied;
+          else if (isLocked) status = SeatStatus.locked;
+
+          return VoiceSeat(
+            seatNumber: seatNum,
+            status: status,
+            userId: sUserId,
+            userName: seatData['user_name'] as String?,
+            avatarUrl: seatData['avatar_url'] as String?,
+            isMuted: seatData['is_muted'] as bool? ?? false,
+            isHost: seatData['is_host'] as bool? ?? false,
+            joinedAt: seatData['joined_at'] != null ? DateTime.parse(seatData['joined_at']) : null,
+          );
         }
-      }),
-      members: profile != null
-          ? [
-              RoomMember(
-                id: profile.id,
-                name: profile.username,
-                avatarUrl: profile.avatarUrl,
-                isHost: true,
-              )
-            ]
-          : const [],
-      messages: const [],
-      activities: const [],
-    );
+        return VoiceSeat(seatNumber: seatNum);
+      });
+
+      // Fetch all room members (everyone present in the room)
+      final membersResponse = await client.from('room_members').select().eq('room_id', roomId);
+      final List<RoomMember> allMembers = membersResponse.cast<Map<String, dynamic>>().map((m) {
+        final mUserId = m['user_id'] as String? ?? '';
+        return RoomMember(
+          id: mUserId,
+          name: m['user_name'] as String? ?? 'User',
+          avatarUrl: m['avatar_url'] as String?,
+          score: mUserId == hostId ? 5000 : 1500,
+          isHost: mUserId == hostId,
+        );
+      }).toList();
+
+      // If room_members table empty, fall back to seats-based members
+      final members = allMembers.isNotEmpty ? allMembers : _buildMembersFromSeats(seats);
+
+      // Get announcement
+      String announcementText = 'Welcome to the room';
+      try {
+        final ann = await client.from('room_announcements')
+            .select().eq('room_id', roomId).order('updated_at', ascending: false).limit(1).maybeSingle();
+        if (ann != null) announcementText = ann['text'] as String? ?? announcementText;
+      } catch (_) {}
+
+      final room = FamilyWatchRoom(
+        id: roomResponse['id'],
+        name: roomResponse['name'],
+        roomId: roomResponse['id'],
+        hostId: hostId,
+        currentUserId: userId,
+        roomType: type,
+        currentVideoId: roomResponse['current_video_id'],
+        currentPosition: roomResponse['current_position'] ?? 0,
+        isPlaying: roomResponse['is_playing'] ?? false,
+        micLocked: roomResponse['mic_locked'] ?? false,
+        seats: seats,
+        members: members,
+        announcement: Announcement(text: announcementText, updatedAt: DateTime.now()),
+      );
+
+      state = state.copyWith(
+        isLoading: false,
+        room: room,
+      );
+
+      _initRealtime(roomId);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
+
+  List<RoomMember> _buildMembersFromSeats(List<VoiceSeat> seats) {
+    return seats
+        .where((s) => s.status == SeatStatus.occupied)
+        .map((s) => RoomMember(
+              id: s.userId ?? '',
+              name: s.userName ?? 'Unknown',
+              avatarUrl: s.avatarUrl,
+              score: s.isHost ? 5000 : 1500,
+              isHost: s.isHost,
+            ))
+        .toList();
   }
 
   // --- Room Type ---
@@ -184,8 +255,56 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         _handleSeatSync(payload.newRecord);
       },
     );
+
+    // Listen for member join/leave (room_members table)
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'room_members',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'room_id',
+        value: roomId,
+      ),
+      callback: (payload) {
+        if (payload.eventType == PostgresChangeEvent.delete) {
+          _handleMemberLeft(payload.oldRecord);
+        } else {
+          _handleMemberSync(payload.newRecord);
+        }
+      },
+    );
     
     _channel!.subscribe();
+  }
+
+  void _handleMemberSync(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    final mUserId = data['user_id'] as String? ?? '';
+    final hostId = state.room.hostId;
+
+    final newMember = RoomMember(
+      id: mUserId,
+      name: data['user_name'] as String? ?? 'User',
+      avatarUrl: data['avatar_url'] as String?,
+      score: mUserId == hostId ? 5000 : 1500,
+      isHost: mUserId == hostId,
+    );
+
+    final existing = state.room.members.any((m) => m.id == mUserId);
+    if (!existing) {
+      state = state.copyWith(
+        members: [...state.room.members, newMember],
+      );
+    }
+  }
+
+  void _handleMemberLeft(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    final mUserId = data['user_id'] as String? ?? '';
+    state = state.copyWith(
+      members: state.room.members.where((m) => m.id != mUserId).toList(),
+    );
   }
 
   void _handleSeatSync(Map<String, dynamic> data) {
@@ -221,13 +340,17 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       joinedAt: data['joined_at'] != null ? DateTime.parse(data['joined_at']) : null,
     );
 
-    state = state.copyWith(seats: seats);
+    state = state.copyWith(
+      seats: seats,
+      members: _buildMembersFromSeats(seats),
+    );
   }
 
   void _handleMovieSync(Map<String, dynamic> data) {
     final videoId = data['current_video_id'] as String?;
     final position = data['current_position'] as int? ?? 0;
     final isPlaying = data['is_playing'] as bool? ?? false;
+    final micLocked = data['mic_locked'] as bool? ?? false;
 
     final updatedRoom = FamilyWatchRoom(
       id: state.room.id,
@@ -245,6 +368,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       currentVideoId: videoId,
       currentPosition: position,
       isPlaying: isPlaying,
+      micLocked: micLocked,
     );
     state = state.copyWith(room: updatedRoom);
   }
@@ -387,7 +511,11 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       _syncSeatToSupabase(seats[existingIndex]);
     }
 
-    final profile = ref.read(currentUserProfileProvider).value;
+    ProfileModel? profile;
+    try {
+      profile = await ref.read(currentUserProfileProvider.future);
+    } catch (_) {}
+    
     final userName = profile?.username ?? 'User';
     final avatarUrl = profile?.avatarUrl;
 
@@ -400,7 +528,10 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       joinedAt: DateTime.now(),
     );
 
-    state = state.copyWith(seats: seats);
+    state = state.copyWith(
+      seats: seats,
+      members: _updateMembersFromSeats(seats, existingIndex != -1 ? existingIndex : null, index),
+    );
     _syncSeatToSupabase(seats[index]);
   }
 
@@ -408,6 +539,8 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     final seats = [...state.room.seats];
     final index = seats.indexWhere((s) => s.seatNumber == seatNumber);
     if (index == -1) return;
+
+    final leavingUserId = seats[index].userId;
 
     seats[index] = seats[index].copyWith(
       status: SeatStatus.empty,
@@ -420,8 +553,35 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       joinedAt: null,
     );
 
-    state = state.copyWith(seats: seats);
+    state = state.copyWith(
+      seats: seats,
+      members: state.room.members.where((m) => m.id != leavingUserId).toList(),
+    );
     _syncSeatToSupabase(seats[index]);
+  }
+
+  List<RoomMember> _updateMembersFromSeats(List<VoiceSeat> seats, int? oldSeatIndex, int newSeatIndex) {
+    final members = List<RoomMember>.from(state.room.members);
+    
+    // Remove user from old seat (if moving seats)
+    if (oldSeatIndex != null) {
+      final oldUserId = state.room.seats[oldSeatIndex].userId;
+      members.removeWhere((m) => m.id == oldUserId);
+    }
+
+    // Add user to new seat
+    final seat = seats[newSeatIndex];
+    if (seat.status == SeatStatus.occupied && seat.userId != null) {
+      members.add(RoomMember(
+        id: seat.userId!,
+        name: seat.userName ?? 'Unknown',
+        avatarUrl: seat.avatarUrl,
+        score: seat.isHost ? 5000 : 1500,
+        isHost: seat.isHost,
+      ));
+    }
+
+    return members;
   }
 
   void toggleLockSeat(int seatNumber) {
@@ -456,15 +616,31 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
   }
 
   // --- Host Controls ---
-  void lockAllSeats(bool lock) {
+  Future<void> lockAllSeats(bool lock) async {
     if (!state.room.isHost) return;
+    
+    // Update seats locally and sync to Supabase
     final seats = state.room.seats.map((seat) {
       if (seat.status == SeatStatus.occupied) return seat;
       final updatedSeat = seat.copyWith(status: lock ? SeatStatus.locked : SeatStatus.empty);
       _syncSeatToSupabase(updatedSeat);
       return updatedSeat;
     }).toList();
-    state = state.copyWith(seats: seats);
+    
+    state = state.copyWith(
+      seats: seats,
+      micLocked: lock,
+    );
+
+    // Update mic_locked in rooms table
+    if (!state.room.id.startsWith('room-')) {
+      try {
+        final client = ref.read(supabaseClientProvider);
+        await client.from('rooms').update({
+          'mic_locked': lock,
+        }).eq('id', state.room.id);
+      } catch (_) {}
+    }
   }
 
   void muteAllExceptHost(bool mute) {
@@ -478,6 +654,39 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       return seat;
     }).toList();
     state = state.copyWith(seats: seats);
+  }
+
+  Future<void> transferHost(String newHostId) async {
+    if (!state.room.isHost) return;
+
+    // Remove old host flag from current seat
+    final oldHostSeatIndex = state.room.seats.indexWhere((s) => s.userId == state.room.currentUserId);
+    if (oldHostSeatIndex != -1) {
+      final updatedOldHostSeat = state.room.seats[oldHostSeatIndex].copyWith(isHost: false);
+      _syncSeatToSupabase(updatedOldHostSeat);
+    }
+
+    // Add host flag to new host's seat if they are on one
+    final newHostSeatIndex = state.room.seats.indexWhere((s) => s.userId == newHostId);
+    if (newHostSeatIndex != -1) {
+      final updatedNewHostSeat = state.room.seats[newHostSeatIndex].copyWith(isHost: true);
+      _syncSeatToSupabase(updatedNewHostSeat);
+    }
+
+    if (!state.room.id.startsWith('room-')) {
+      try {
+        final client = ref.read(supabaseClientProvider);
+        await client.from('rooms').update({
+          'host_id': newHostId,
+        }).eq('id', state.room.id);
+      } catch (_) {}
+    }
+  }
+
+  void inviteToMic(String userId) {
+    if (!state.room.isHost) return;
+    // In a full implementation, this would send a realtime broadcast or push notification
+    // For now, we can log it or show a local toast
   }
 
   Future<void> _syncSeatToSupabase(VoiceSeat seat) async {
@@ -580,7 +789,26 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
 
   void copyRoomId() {}
 
-  void leaveRoom() {}
+  Future<void> leaveRoom() async {
+    final userId = state.room.currentUserId;
+    final roomId = state.room.id;
+    if (userId.isEmpty || roomId.isEmpty) return;
+
+    // Leave any occupied seat
+    final seatIndex = state.room.seats.indexWhere((s) => s.userId == userId);
+    if (seatIndex != -1) {
+      leaveSeat(state.room.seats[seatIndex].seatNumber);
+    }
+
+    // Remove from room_members table
+    try {
+      final client = ref.read(supabaseClientProvider);
+      await client.from('room_members')
+          .delete()
+          .eq('room_id', roomId)
+          .eq('user_id', userId);
+    } catch (_) {}
+  }
 }
 
 final familyWatchRoomViewModelProvider =

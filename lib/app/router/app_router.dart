@@ -98,7 +98,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/room/:id',
-        builder: (context, state) => const FamilyWatchRoomScreen(),
+        builder: (context, state) {
+          final roomId = state.pathParameters['id']!;
+          return FamilyWatchRoomScreen(roomId: roomId);
+        },
         routes: [
           GoRoute(
             path: 'settings',

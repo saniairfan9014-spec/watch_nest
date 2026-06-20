@@ -35,11 +35,13 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
     );
 
     if (roomState.currentVideoId != null) {
-      _controller.loadVideoById(videoId: roomState.currentVideoId!);
+      _controller.loadVideoById(
+        videoId: roomState.currentVideoId!,
+        startSeconds: roomState.currentPosition.toDouble(),
+      );
       if (!roomState.isPlaying) {
         _controller.pauseVideo();
       }
-      _controller.seekTo(seconds: roomState.currentPosition.toDouble(), allowSeekAhead: true);
       _lastVideoId = roomState.currentVideoId;
       _lastIsPlaying = roomState.isPlaying;
     }

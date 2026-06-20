@@ -22,6 +22,7 @@ class FamilyWatchRoom extends Equatable {
   final String? currentVideoId;
   final int currentPosition;
   final bool isPlaying;
+  final bool micLocked;
   final DateTime? videoUpdatedAt;
 
   const FamilyWatchRoom({
@@ -40,6 +41,7 @@ class FamilyWatchRoom extends Equatable {
     this.currentVideoId,
     this.currentPosition = 0,
     this.isPlaying = false,
+    this.micLocked = false,
     this.videoUpdatedAt,
   });
 
@@ -62,6 +64,7 @@ class FamilyWatchRoom extends Equatable {
         currentVideoId,
         currentPosition,
         isPlaying,
+        micLocked,
         videoUpdatedAt,
       ];
 }

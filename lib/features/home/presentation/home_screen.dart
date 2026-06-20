@@ -148,7 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (index == 3) context.push(AppRoutes.profile);
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Rooms'),
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
           NavigationDestination(icon: Icon(Icons.notifications_outlined), label: 'Notifications'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile'),
