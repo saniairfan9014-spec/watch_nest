@@ -5,6 +5,7 @@ import '../controllers/profile_controller.dart';
 import '../data/profile_model.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../../app/router/app_routes.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -152,7 +153,7 @@ class ProfileScreen extends ConsumerWidget {
                   Icons.access_time,
                   'Last Seen',
                   profile.lastSeen != null
-                      ? _formatDate(profile.lastSeen!)
+                      ? timeago.format(profile.lastSeen!)
                       : 'Unknown',
                 ),
                 _buildInfoTile(

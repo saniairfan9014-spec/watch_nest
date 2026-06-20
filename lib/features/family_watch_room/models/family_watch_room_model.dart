@@ -19,6 +19,10 @@ class FamilyWatchRoom extends Equatable {
   final String hostId;
   final String currentUserId;
   final RoomType roomType;
+  final String? currentVideoId;
+  final int currentPosition;
+  final bool isPlaying;
+  final DateTime? videoUpdatedAt;
 
   const FamilyWatchRoom({
     required this.id,
@@ -32,7 +36,11 @@ class FamilyWatchRoom extends Equatable {
     this.activities = const [],
     required this.hostId,
     required this.currentUserId,
-    this.roomType = RoomType.family,
+    this.roomType = RoomType.general,
+    this.currentVideoId,
+    this.currentPosition = 0,
+    this.isPlaying = false,
+    this.videoUpdatedAt,
   });
 
   bool get isHost => currentUserId == hostId;
@@ -51,5 +59,9 @@ class FamilyWatchRoom extends Equatable {
         hostId,
         currentUserId,
         roomType,
+        currentVideoId,
+        currentPosition,
+        isPlaying,
+        videoUpdatedAt,
       ];
 }

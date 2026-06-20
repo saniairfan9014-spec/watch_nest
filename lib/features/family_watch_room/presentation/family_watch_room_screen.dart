@@ -7,6 +7,8 @@ import '../models/voice_seat_model.dart';
 import '../models/room_activity_model.dart';
 import '../theme/room_theme_config.dart';
 import '../theme/room_theme_manager.dart';
+import '../../rooms/presentation/room_type.dart';
+import 'widgets/movie_player_widget.dart';
 
 class FamilyWatchRoomScreen extends ConsumerStatefulWidget {
   const FamilyWatchRoomScreen({super.key});
@@ -54,27 +56,7 @@ class _FamilyWatchRoomScreenState
       body: Stack(
         children: [
           SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildVoiceSeatsGrid(state, viewModel, theme),
-                        const SizedBox(height: 16),
-                        _buildAnnouncementSection(state, viewModel, theme),
-                        const SizedBox(height: 16),
-                        _buildChatSection(state, viewModel, theme),
-                        const SizedBox(height: 16),
-                        _buildActivitySection(room, theme),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            child: _buildRoomContent(state, viewModel, theme),
           ),
           if (state.showMembersPanel) _buildMembersPanel(state, viewModel),
           if (state.showInvitePanel) _buildInvitePanel(viewModel),
@@ -83,6 +65,142 @@ class _FamilyWatchRoomScreenState
         ],
       ),
       bottomNavigationBar: _buildBottomBar(state, viewModel, theme),
+    );
+  }
+
+  Widget _buildRoomContent(FamilyWatchRoomState state, viewModel, RoomThemeConfig theme) {
+    switch (state.room.roomType) {
+      case RoomType.movie:
+        return _buildMovieModeContent(state, viewModel, theme);
+      default:
+        return _buildDefaultModeContent(state, viewModel, theme);
+    }
+  }
+
+  Widget _buildMovieModeContent(FamilyWatchRoomState state, viewModel, RoomThemeConfig theme) {
+    return Column(
+      children: [
+        const MoviePlayerWidget(),
+        // Voice seats and chat in movie mode
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildVoiceSeatsGrid(state, viewModel, theme),
+                const SizedBox(height: 16),
+                _buildChatSection(state, viewModel, theme),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDefaultModeContent(FamilyWatchRoomState state, viewModel, RoomThemeConfig theme) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // If general mode, show mode selector
+                if (state.room.roomType == RoomType.general) ...[
+                  _buildGeneralModeSelector(state, viewModel, theme),
+                  const SizedBox(height: 16),
+                ],
+                _buildVoiceSeatsGrid(state, viewModel, theme),
+                const SizedBox(height: 16),
+                _buildAnnouncementSection(state, viewModel, theme),
+                const SizedBox(height: 16),
+                _buildChatSection(state, viewModel, theme),
+                const SizedBox(height: 16),
+                _buildActivitySection(state.room, theme),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGeneralModeSelector(FamilyWatchRoomState state, viewModel, RoomThemeConfig theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.primarySwatch.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.primarySwatch.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Choose Room Mode',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: theme.primarySwatch.shade700),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildModeCard(
+                  icon: Icons.movie,
+                  label: 'Movie Mode',
+                  color: Colors.deepPurple,
+                  onTap: () {
+                    if (state.room.isHost) {
+                      viewModel.setRoomType(RoomType.movie);
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildModeCard(
+                  icon: Icons.music_note,
+                  label: 'Music Mode',
+                  color: Colors.pink,
+                  onTap: () {
+                    if (state.room.isHost) {
+                      viewModel.setRoomType(RoomType.music);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeCard({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 36, color: color),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(fontWeight: FontWeight.w600, color: color),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 

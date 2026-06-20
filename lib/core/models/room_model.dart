@@ -10,6 +10,10 @@ class RoomModel extends Equatable {
   final String? password;
   final String? inviteCode;
   final int currentMemberCount;
+  final String? currentVideoId;
+  final int currentPosition;
+  final bool isPlaying;
+  final DateTime? videoUpdatedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -22,6 +26,10 @@ class RoomModel extends Equatable {
     this.password,
     this.inviteCode,
     this.currentMemberCount = 0,
+    this.currentVideoId,
+    this.currentPosition = 0,
+    this.isPlaying = false,
+    this.videoUpdatedAt,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -34,13 +42,19 @@ class RoomModel extends Equatable {
       roomType: json['room_type'] != null
           ? RoomType.values.firstWhere(
               (e) => e.name == json['room_type'],
-              orElse: () => RoomType.family,
+              orElse: () => RoomType.general,
             )
-          : RoomType.family,
+          : RoomType.general,
       isPrivate: json['is_private'] as bool? ?? false,
       password: json['password'] as String?,
       inviteCode: json['invite_code'] as String?,
       currentMemberCount: json['current_member_count'] as int? ?? 0,
+      currentVideoId: json['current_video_id'] as String?,
+      currentPosition: json['current_position'] as int? ?? 0,
+      isPlaying: json['is_playing'] as bool? ?? false,
+      videoUpdatedAt: json['video_updated_at'] != null 
+          ? DateTime.parse(json['video_updated_at'] as String) 
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -58,6 +72,10 @@ class RoomModel extends Equatable {
         'password': password,
         'invite_code': inviteCode,
         'current_member_count': currentMemberCount,
+        'current_video_id': currentVideoId,
+        'current_position': currentPosition,
+        'is_playing': isPlaying,
+        if (videoUpdatedAt != null) 'video_updated_at': videoUpdatedAt!.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
       };
@@ -72,6 +90,10 @@ class RoomModel extends Equatable {
         password,
         inviteCode,
         currentMemberCount,
+        currentVideoId,
+        currentPosition,
+        isPlaying,
+        videoUpdatedAt,
         createdAt,
         updatedAt,
       ];

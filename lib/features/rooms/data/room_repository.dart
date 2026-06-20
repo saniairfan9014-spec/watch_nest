@@ -56,4 +56,14 @@ class RoomRepository {
     if (data == null) return null;
     return RoomModel.fromJson(data);
   }
+
+  Future<RoomModel?> getUserHostedRoom(String userId) async {
+    final data = await _client
+        .from('rooms')
+        .select()
+        .eq('host_id', userId)
+        .maybeSingle();
+    if (data == null) return null;
+    return RoomModel.fromJson(data);
+  }
 }

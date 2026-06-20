@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../rooms/presentation/room_type.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/supabase_client.dart';
 import 'family_watch_room_state.dart';
 import '../models/voice_seat_model.dart';
@@ -12,9 +13,17 @@ import '../../profile/controllers/profile_controller.dart';
 import '../../profile/data/profile_model.dart';
 
 class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
+  RealtimeChannel? _channel;
+
   @override
   FamilyWatchRoomState build() {
     final profile = ref.watch(currentUserProfileProvider).value;
+
+    ref.onDispose(() {
+      _channel?.unsubscribe();
+    });
+
+    _initRealtime('room-1'); // Default to room-1 for now, in a real app this would be passed in
 
     return FamilyWatchRoomState(
       room: _createSampleRoom(profile),
@@ -39,12 +48,12 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
   FamilyWatchRoom _createSampleRoom(ProfileModel? profile) {
     return FamilyWatchRoom(
       id: 'room-1',
-      name: 'Family Movie Night',
+      name: 'General Room',
       roomId: '25163166097',
       points: 148600,
       hostId: 'user-1',
       currentUserId: 'user-1',
-      roomType: RoomType.family,
+      roomType: RoomType.general,
       announcement: Announcement(
         text: 'The host didn\'t add anything yet',
         updatedAt: DateTime(2026, 6, 18),
@@ -118,6 +127,104 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         'room_type': type.name,
       }).eq('id', state.room.id);
     } catch (_) {}
+  }
+
+  void updateRoomLocally({required String name, required RoomType type}) {
+    final updatedRoom = FamilyWatchRoom(
+      id: state.room.id,
+      name: name,
+      roomId: state.room.roomId,
+      points: state.room.points,
+      seats: state.room.seats,
+      members: state.room.members,
+      announcement: state.room.announcement,
+      messages: state.room.messages,
+      activities: state.room.activities,
+      hostId: state.room.hostId,
+      currentUserId: state.room.currentUserId,
+      roomType: type,
+    );
+    state = state.copyWith(room: updatedRoom);
+  }
+
+  // --- Realtime Sync ---
+
+  void _initRealtime(String roomId) {
+    if (roomId.startsWith('room-')) return; // Skip realtime for dummy room
+
+    final client = ref.read(supabaseClientProvider);
+    _channel = client.channel('room:movie:$roomId');
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.update,
+      schema: 'public',
+      table: 'rooms',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'id',
+        value: roomId,
+      ),
+      callback: (payload) {
+        _handleMovieSync(payload.newRecord);
+      },
+    ).subscribe();
+  }
+
+  void _handleMovieSync(Map<String, dynamic> data) {
+    final videoId = data['current_video_id'] as String?;
+    final position = data['current_position'] as int? ?? 0;
+    final isPlaying = data['is_playing'] as bool? ?? false;
+
+    final updatedRoom = FamilyWatchRoom(
+      id: state.room.id,
+      name: state.room.name,
+      roomId: state.room.roomId,
+      points: state.room.points,
+      seats: state.room.seats,
+      members: state.room.members,
+      announcement: state.room.announcement,
+      messages: state.room.messages,
+      activities: state.room.activities,
+      hostId: state.room.hostId,
+      currentUserId: state.room.currentUserId,
+      roomType: state.room.roomType,
+      currentVideoId: videoId,
+      currentPosition: position,
+      isPlaying: isPlaying,
+    );
+    state = state.copyWith(room: updatedRoom);
+  }
+
+  Future<void> updateMovieState(String? videoId, bool isPlaying, int position) async {
+    final updatedRoom = FamilyWatchRoom(
+      id: state.room.id,
+      name: state.room.name,
+      roomId: state.room.roomId,
+      points: state.room.points,
+      seats: state.room.seats,
+      members: state.room.members,
+      announcement: state.room.announcement,
+      messages: state.room.messages,
+      activities: state.room.activities,
+      hostId: state.room.hostId,
+      currentUserId: state.room.currentUserId,
+      roomType: state.room.roomType,
+      currentVideoId: videoId,
+      currentPosition: position,
+      isPlaying: isPlaying,
+    );
+    state = state.copyWith(room: updatedRoom);
+
+    if (!state.room.id.startsWith('room-')) {
+      try {
+        final client = ref.read(supabaseClientProvider);
+        await client.from('rooms').update({
+          'current_video_id': videoId,
+          'current_position': position,
+          'is_playing': isPlaying,
+          'video_updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', state.room.id);
+      } catch (_) {}
+    }
   }
 
   // --- Search ---

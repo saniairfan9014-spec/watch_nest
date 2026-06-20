@@ -5,17 +5,17 @@ import 'room_theme_config.dart';
 class RoomThemeManager {
   RoomThemeConfig getConfig(RoomType type) {
     switch (type) {
-      case RoomType.family:
+      case RoomType.general:
         return const RoomThemeConfig(
-          roomType: RoomType.family,
-          primarySwatch: Colors.orange,
-          seatOccupiedColor: Color(0xFFFFF3E0),
+          roomType: RoomType.general,
+          primarySwatch: Colors.blue,
+          seatOccupiedColor: Color(0xFFE3F2FD),
           seatEmptyColor: Color(0xFFF5F5F5),
           seatLockedColor: Color(0xFFFFEBEE),
-          accentColor: Color(0xFFFF9800),
-          roomIcon: Icons.home_rounded,
-          seatIcon: Icons.weekend_rounded,
-          backgroundHint: 'Cozy living room atmosphere',
+          accentColor: Color(0xFF2196F3),
+          roomIcon: Icons.dashboard_rounded,
+          seatIcon: Icons.person_rounded,
+          backgroundHint: 'General room - choose your vibe',
         );
       case RoomType.movie:
         return const RoomThemeConfig(
@@ -40,54 +40,6 @@ class RoomThemeManager {
           roomIcon: Icons.music_note_rounded,
           seatIcon: Icons.album_rounded,
           backgroundHint: 'Vinyl records & music vibes',
-        );
-      case RoomType.gaming:
-        return const RoomThemeConfig(
-          roomType: RoomType.gaming,
-          primarySwatch: Colors.red,
-          seatOccupiedColor: Color(0xFFFFEBEE),
-          seatEmptyColor: Color(0xFFF5F5F5),
-          seatLockedColor: Color(0xFFE0F7FA),
-          accentColor: Color(0xFFF44336),
-          roomIcon: Icons.sports_esports_rounded,
-          seatIcon: Icons.videogame_asset_rounded,
-          backgroundHint: 'Gaming room setup',
-        );
-      case RoomType.study:
-        return const RoomThemeConfig(
-          roomType: RoomType.study,
-          primarySwatch: Colors.teal,
-          seatOccupiedColor: Color(0xFFE0F2F1),
-          seatEmptyColor: Color(0xFFF5F5F5),
-          seatLockedColor: Color(0xFFFFEBEE),
-          accentColor: Color(0xFF009688),
-          roomIcon: Icons.menu_book_rounded,
-          seatIcon: Icons.lightbulb_rounded,
-          backgroundHint: 'Library & workspace focus',
-        );
-      case RoomType.chill:
-        return const RoomThemeConfig(
-          roomType: RoomType.chill,
-          primarySwatch: Colors.indigo,
-          seatOccupiedColor: Color(0xFFE8EAF6),
-          seatEmptyColor: Color(0xFFF5F5F5),
-          seatLockedColor: Color(0xFFFFEBEE),
-          accentColor: Color(0xFF5C6BC0),
-          roomIcon: Icons.air_rounded,
-          seatIcon: Icons.whatshot_rounded,
-          backgroundHint: 'Relaxed hangout space',
-        );
-      case RoomType.party:
-        return const RoomThemeConfig(
-          roomType: RoomType.party,
-          primarySwatch: Colors.amber,
-          seatOccupiedColor: Color(0xFFFFF8E1),
-          seatEmptyColor: Color(0xFFF5F5F5),
-          seatLockedColor: Color(0xFFFFEBEE),
-          accentColor: Color(0xFFFFC107),
-          roomIcon: Icons.celebration_rounded,
-          seatIcon: Icons.celebration_rounded,
-          backgroundHint: 'Celebration & fun atmosphere',
         );
     }
   }

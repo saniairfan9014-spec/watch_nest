@@ -11,7 +11,7 @@ class CreateRoomState {
   final bool isLoading;
 
   const CreateRoomState({
-    this.selectedType = RoomType.family,
+    this.selectedType = RoomType.general,
     this.selectedPrivacy = RoomPrivacy.public,
     this.obscurePassword = true,
     this.isLoading = false,
@@ -57,6 +57,11 @@ class CreateRoomViewModel extends Notifier<CreateRoomState> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
+
+      final existingRoom = await ref.read(roomRepositoryProvider).getUserHostedRoom(user.id);
+      if (existingRoom != null) {
+        throw Exception('You already have a room. You cannot create another one.');
+      }
 
       await ref.read(roomRepositoryProvider).createRoom(
         name: name,

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../app/router/app_routes.dart';
+import '../../auth/controllers/auth_controller.dart';
 import '../controllers/home_controller.dart';
 import 'widgets/room_card.dart';
 
@@ -18,6 +20,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final roomsAsync = ref.watch(roomsProvider);
+    final authState = ref.watch(authStateProvider);
+    final currentUser = authState.value?.session?.user;
+
+    bool userHasRoom = false;
+    if (roomsAsync.hasValue && currentUser != null) {
+      userHasRoom = roomsAsync.value!.any((room) => room.hostId == currentUser.id);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -44,30 +53,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Create a Room',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Invite family & friends and start your party',
-                        style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => context.push(AppRoutes.createRoom),
-                        child: const Text('Create Room'),
-                      ),
-                    ],
+              if (!userHasRoom)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Create a Room',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Invite family & friends and start your party',
+                          style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => context.push(AppRoutes.createRoom),
+                          child: const Text('Create Room'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 24),
               const Text(
                 'Your Rooms',
@@ -117,14 +127,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => context.push(AppRoutes.createRoom),
-                  child: const Text('+ Create Room'),
+              if (!userHasRoom)
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => context.push(AppRoutes.createRoom),
+                    child: const Text('+ Create Room'),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

@@ -53,44 +53,71 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         child: ScaleTransition(
           scale: _scaleAnim,
           child: Container(
-            color: const Color(0xFF1A0E05),
-            child: Center(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // 1. Frame / Room background
-                  SizedBox(
-                    width: double.infinity,
-                    child: Image.asset(
-                      'assets/images/splash/frame .png',
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
-                  // 2. Family sitting on couch
-                  SizedBox(
-                    width: double.infinity,
-                    child: Image.asset(
-                      'assets/images/splash/family.png',
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
-                  // 3. Logo on TV screen
-                  SizedBox(
-                    width: double.infinity,
-                    child: Image.asset(
-                      'assets/images/splash/logo2.png',
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
-                  // 4. Popcorn in front
-                  SizedBox(
-                    width: double.infinity,
-                    child: Image.asset(
-                      'assets/images/splash/popcorn.png',
-                      fit: BoxFit.fitWidth,
-                    ),
-                  ),
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.2), // Glow slightly above center
+                radius: 1.2,
+                colors: [
+                  Color(0xFF4A2211), // Rich cinematic warm glow
+                  Color(0xFF1A0E05), // Original dark color
+                  Color(0xFF050201), // Deep edge shadow
                 ],
+                stops: [0.0, 0.6, 1.0],
+              ),
+            ),
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 0,
+                  children: [
+                    // 1. Frame / Room background
+                    SizedBox(
+                      width: double.infinity,
+                      child: Image.asset(
+                        'assets/images/splash/frame .png',
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                    // 2. Logo on TV screen
+                    SizedBox(
+                      width: double.infinity,
+                      child: Image.asset(
+                        'assets/images/splash/logo2.png',
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                    // 3. Family + Popcorn (stacked - popcorn in front)
+                    SizedBox(
+                      width: double.infinity,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Family sitting on couch
+                          SizedBox(
+                            width: double.infinity,
+                            child: Image.asset(
+                              'assets/images/splash/family.png',
+                              fit: BoxFit.fitWidth,
+                            ),
+                          ),
+                          // Popcorn in front
+                          Positioned(
+                            bottom: 0,
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width * 0.5, // Reduced size (50% of screen width)
+                              child: Image.asset(
+                                'assets/images/splash/popcorn.png',
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

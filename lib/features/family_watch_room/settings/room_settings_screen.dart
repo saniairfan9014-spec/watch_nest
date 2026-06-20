@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../rooms/presentation/room_type.dart';
+import '../presentation/family_watch_room_viewmodel.dart';
 import 'room_settings_viewmodel.dart';
 import '../theme/room_theme_manager.dart';
 
@@ -19,6 +20,22 @@ class _RoomSettingsScreenState extends ConsumerState<RoomSettingsScreen> {
   final _descriptionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   final _themeManager = RoomThemeManager();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final roomState = ref.read(familyWatchRoomViewModelProvider).room;
+      final viewModel = ref.read(roomSettingsViewModelProvider.notifier);
+      
+      _nameController.text = roomState.name;
+      viewModel.setRoomName(roomState.name);
+      viewModel.setRoomType(roomState.roomType);
+      
+      // Note: roomDescription and isPrivate aren't part of FamilyWatchRoom model yet, 
+      // so they are left as defaults.
+    });
+  }
 
   @override
   void dispose() {
@@ -44,6 +61,10 @@ class _RoomSettingsScreenState extends ConsumerState<RoomSettingsScreen> {
                     if (!_formKey.currentState!.validate()) return;
                     try {
                       await viewModel.saveSettings(widget.roomId);
+                      ref.read(familyWatchRoomViewModelProvider.notifier).updateRoomLocally(
+                            name: state.roomName,
+                            type: state.selectedType,
+                          );
                       if (mounted) context.pop();
                     } catch (e) {
                       if (mounted) {
@@ -152,7 +173,7 @@ class _RoomSettingsScreenState extends ConsumerState<RoomSettingsScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Room Type',
+                'Room Mode',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 12),

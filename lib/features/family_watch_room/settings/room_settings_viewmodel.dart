@@ -11,7 +11,7 @@ class RoomSettingsState {
   final bool isSaved;
 
   const RoomSettingsState({
-    this.selectedType = RoomType.family,
+    this.selectedType = RoomType.general,
     this.roomName = '',
     this.roomDescription = '',
     this.isPrivate = false,
@@ -62,12 +62,15 @@ class RoomSettingsViewModel extends Notifier<RoomSettingsState> {
     state = state.copyWith(isLoading: true);
 
     try {
-      final client = ref.read(supabaseClientProvider);
-      await client.from('rooms').update({
-        'room_type': state.selectedType.name,
-        'name': state.roomName,
-        'is_private': state.isPrivate,
-      }).eq('id', roomId);
+      // Bypass backend update for dummy rooms (which don't have valid UUIDs)
+      if (!roomId.startsWith('room-')) {
+        final client = ref.read(supabaseClientProvider);
+        await client.from('rooms').update({
+          'room_type': state.selectedType.name,
+          'name': state.roomName,
+          'is_private': state.isPrivate,
+        }).eq('id', roomId);
+      }
 
       state = state.copyWith(isSaved: true, isLoading: false);
     } catch (e) {
