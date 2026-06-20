@@ -10,6 +10,8 @@ class VoiceSeat extends Equatable {
   final String? avatarUrl;
   final bool isMuted;
   final bool isHost;
+  final bool isSpeaking;
+  final DateTime? joinedAt;
 
   const VoiceSeat({
     required this.seatNumber,
@@ -19,6 +21,8 @@ class VoiceSeat extends Equatable {
     this.avatarUrl,
     this.isMuted = false,
     this.isHost = false,
+    this.isSpeaking = false,
+    this.joinedAt,
   });
 
   VoiceSeat copyWith({
@@ -29,6 +33,8 @@ class VoiceSeat extends Equatable {
     String? avatarUrl,
     bool? isMuted,
     bool? isHost,
+    bool? isSpeaking,
+    DateTime? joinedAt,
   }) {
     return VoiceSeat(
       seatNumber: seatNumber ?? this.seatNumber,
@@ -38,9 +44,11 @@ class VoiceSeat extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isMuted: isMuted ?? this.isMuted,
       isHost: isHost ?? this.isHost,
+      isSpeaking: isSpeaking ?? this.isSpeaking,
+      joinedAt: joinedAt ?? this.joinedAt,
     );
   }
 
   @override
-  List<Object?> get props => [seatNumber, status, userId, userName, avatarUrl, isMuted, isHost];
+  List<Object?> get props => [seatNumber, status, userId, userName, avatarUrl, isMuted, isHost, isSpeaking, joinedAt];
 }

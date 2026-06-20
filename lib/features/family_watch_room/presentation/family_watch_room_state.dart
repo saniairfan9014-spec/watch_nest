@@ -74,6 +74,11 @@ class FamilyWatchRoomState {
         activities: activities ?? updatedRoom.activities,
         hostId: updatedRoom.hostId,
         currentUserId: updatedRoom.currentUserId,
+        roomType: updatedRoom.roomType,
+        currentVideoId: updatedRoom.currentVideoId,
+        currentPosition: updatedRoom.currentPosition,
+        isPlaying: updatedRoom.isPlaying,
+        videoUpdatedAt: updatedRoom.videoUpdatedAt,
       );
     }
     return FamilyWatchRoomState(

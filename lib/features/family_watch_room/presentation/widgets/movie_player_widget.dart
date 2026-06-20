@@ -64,23 +64,31 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
   void _startHostSync() {
     // Periodically sync current position to backend
     _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      _syncToBackend();
+      final roomState = ref.read(familyWatchRoomViewModelProvider).room;
+      if (roomState.currentVideoId != null) {
+        _syncToBackend();
+      }
     });
   }
 
   Future<void> _syncToBackend() async {
-    final videoId = await _controller.videoData.then((v) => v.videoId);
-    if (videoId.isEmpty) return;
+    try {
+      final videoId = await _controller.videoData.then((v) => v.videoId);
+      if (videoId.isEmpty) return;
 
-    final position = await _controller.currentTime;
-    final state = await _controller.playerState;
-    final isPlaying = state == PlayerState.playing;
+      final position = await _controller.currentTime;
+      final state = await _controller.playerState;
+      final isPlaying = state == PlayerState.playing;
 
-    ref.read(familyWatchRoomViewModelProvider.notifier).updateMovieState(
-      videoId,
-      isPlaying,
-      position.toInt(),
-    );
+      ref.read(familyWatchRoomViewModelProvider.notifier).updateMovieState(
+        videoId,
+        isPlaying,
+        position.toInt(),
+      );
+    } catch (e) {
+      // Ignore timeouts when player is not fully initialized or not in widget tree
+      debugPrint('Movie sync ignored due to player state: $e');
+    }
   }
 
   @override
@@ -95,11 +103,33 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
     final url = _urlController.text.trim();
     if (url.isEmpty) return;
 
-    final videoId = YoutubePlayerController.convertUrlToId(url);
-    if (videoId != null) {
+    String? videoId;
+    
+    if (url.length == 11 && !url.contains('://')) {
+      videoId = url;
+    } else {
+      videoId = YoutubePlayerController.convertUrlToId(url);
+      if (videoId == null) {
+        final RegExp regex = RegExp(
+            r'.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|\?v=)([^#\&\?]*).*');
+        final Match? match = regex.firstMatch(url);
+        if (match != null && match.group(1)?.length == 11) {
+          videoId = match.group(1);
+        }
+      }
+    }
+
+    if (videoId != null && videoId.length == 11) {
       _isLocalChange = true;
+      
+      // Update state instantly so UI mounts the player BEFORE we try to sync
+      ref.read(familyWatchRoomViewModelProvider.notifier).updateMovieState(
+        videoId,
+        true,
+        0,
+      );
+      
       _controller.loadVideoById(videoId: videoId);
-      _syncToBackend();
       _urlController.clear();
       
       Future.delayed(const Duration(seconds: 2), () {
@@ -107,7 +137,7 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid YouTube URL')),
+        const SnackBar(content: Text('Invalid YouTube URL or ID')),
       );
     }
   }
@@ -209,6 +239,102 @@ class _MoviePlayerWidgetState extends ConsumerState<MoviePlayerWidget> {
                         backgroundColor: Colors.black,
                       ),
                     ),
+        ),
+        
+        // Custom Controls for Host
+        if (roomState.isHost && roomState.currentVideoId != null)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            color: Colors.grey.shade900,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildControlButton(
+                  icon: Icons.replay_10,
+                  label: 'Rewind',
+                  onTap: () async {
+                    final currentTime = await _controller.currentTime;
+                    _controller.seekTo(seconds: (currentTime - 10).clamp(0, double.infinity), allowSeekAhead: true);
+                    Future.delayed(const Duration(milliseconds: 500), _syncToBackend);
+                  },
+                ),
+                const SizedBox(width: 20),
+                _buildControlButton(
+                  icon: Icons.pause,
+                  label: 'Pause',
+                  onTap: () {
+                    _controller.pauseVideo();
+                    Future.delayed(const Duration(milliseconds: 500), _syncToBackend);
+                  },
+                ),
+                const SizedBox(width: 20),
+                _buildControlButton(
+                  icon: Icons.play_arrow,
+                  label: 'Play',
+                  isPrimary: true,
+                  onTap: () {
+                    _controller.playVideo();
+                    Future.delayed(const Duration(milliseconds: 500), _syncToBackend);
+                  },
+                ),
+                const SizedBox(width: 20),
+                _buildControlButton(
+                  icon: Icons.forward_10,
+                  label: 'Forward',
+                  onTap: () async {
+                    final currentTime = await _controller.currentTime;
+                    _controller.seekTo(seconds: currentTime + 10, allowSeekAhead: true);
+                    Future.delayed(const Duration(milliseconds: 500), _syncToBackend);
+                  },
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isPrimary = false,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isPrimary ? Colors.amber : Colors.grey.shade800,
+              shape: BoxShape.circle,
+              boxShadow: isPrimary
+                  ? [
+                      BoxShadow(
+                        color: Colors.amber.withOpacity(0.4),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      )
+                    ]
+                  : null,
+            ),
+            child: Icon(
+              icon,
+              color: isPrimary ? Colors.black : Colors.white,
+              size: isPrimary ? 32 : 24,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ],
     );

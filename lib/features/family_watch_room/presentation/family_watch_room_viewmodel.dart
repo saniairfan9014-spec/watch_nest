@@ -153,7 +153,9 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     if (roomId.startsWith('room-')) return; // Skip realtime for dummy room
 
     final client = ref.read(supabaseClientProvider);
-    _channel = client.channel('room:movie:$roomId');
+    _channel = client.channel('room:data:$roomId');
+    
+    // Listen for room updates (movie state, etc.)
     _channel!.onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
@@ -166,7 +168,60 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       callback: (payload) {
         _handleMovieSync(payload.newRecord);
       },
-    ).subscribe();
+    );
+
+    // Listen for seat updates (mic management)
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'room_seats',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'room_id',
+        value: roomId,
+      ),
+      callback: (payload) {
+        _handleSeatSync(payload.newRecord);
+      },
+    );
+    
+    _channel!.subscribe();
+  }
+
+  void _handleSeatSync(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    
+    final seatNumber = data['seat_number'] as int?;
+    if (seatNumber == null) return;
+
+    final seats = [...state.room.seats];
+    final index = seats.indexWhere((s) => s.seatNumber == seatNumber);
+    if (index == -1) return;
+
+    final userId = data['user_id'] as String?;
+    final isLocked = data['is_locked'] as bool? ?? false;
+    final isMuted = data['is_muted'] as bool? ?? false;
+    
+    SeatStatus status;
+    if (userId != null) {
+      status = SeatStatus.occupied;
+    } else if (isLocked) {
+      status = SeatStatus.locked;
+    } else {
+      status = SeatStatus.empty;
+    }
+
+    seats[index] = seats[index].copyWith(
+      status: status,
+      userId: userId,
+      userName: data['user_name'] as String?,
+      avatarUrl: data['avatar_url'] as String?,
+      isMuted: isMuted,
+      isHost: data['is_host'] as bool? ?? false,
+      joinedAt: data['joined_at'] != null ? DateTime.parse(data['joined_at']) : null,
+    );
+
+    state = state.copyWith(seats: seats);
   }
 
   void _handleMovieSync(Map<String, dynamic> data) {
@@ -306,11 +361,31 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
 
   // --- Seats ---
 
-  void joinSeat(int seatNumber) {
+  void joinSeat(int seatNumber) async {
+    // Mic 1 is strictly for the Host
+    if (seatNumber == 1 && !state.room.isHost) return;
+    if (state.room.isHost && seatNumber != 1) return;
+
     final seats = [...state.room.seats];
     final index = seats.indexWhere((s) => s.seatNumber == seatNumber);
     if (index == -1) return;
     if (seats[index].status != SeatStatus.empty) return;
+
+    // Check if user is already on a seat and remove them from it (prevent double seat grabbing)
+    final existingIndex = seats.indexWhere((s) => s.userId == state.room.currentUserId);
+    if (existingIndex != -1) {
+      seats[existingIndex] = seats[existingIndex].copyWith(
+        status: SeatStatus.empty,
+        userId: null,
+        userName: null,
+        avatarUrl: null,
+        isMuted: false,
+        isHost: false,
+        isSpeaking: false,
+        joinedAt: null,
+      );
+      _syncSeatToSupabase(seats[existingIndex]);
+    }
 
     final profile = ref.read(currentUserProfileProvider).value;
     final userName = profile?.username ?? 'User';
@@ -321,9 +396,12 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       userId: state.room.currentUserId,
       userName: userName,
       avatarUrl: avatarUrl,
+      isHost: state.room.currentUserId == state.room.hostId,
+      joinedAt: DateTime.now(),
     );
 
     state = state.copyWith(seats: seats);
+    _syncSeatToSupabase(seats[index]);
   }
 
   void leaveSeat(int seatNumber) {
@@ -335,14 +413,19 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       status: SeatStatus.empty,
       userId: null,
       userName: null,
+      avatarUrl: null,
       isMuted: false,
       isHost: false,
+      isSpeaking: false,
+      joinedAt: null,
     );
 
     state = state.copyWith(seats: seats);
+    _syncSeatToSupabase(seats[index]);
   }
 
   void toggleLockSeat(int seatNumber) {
+    if (!state.room.isHost) return;
     final seats = [...state.room.seats];
     final index = seats.indexWhere((s) => s.seatNumber == seatNumber);
     if (index == -1) return;
@@ -356,9 +439,12 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     }
 
     state = state.copyWith(seats: seats);
+    _syncSeatToSupabase(seats[index]);
   }
 
   void toggleMuteUser(int seatNumber) {
+    if (!state.room.isHost && state.room.currentUserId != state.room.seats.firstWhere((s) => s.seatNumber == seatNumber).userId) return;
+    
     final seats = [...state.room.seats];
     final index = seats.indexWhere((s) => s.seatNumber == seatNumber);
     if (index == -1) return;
@@ -366,6 +452,53 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
 
     seats[index] = seats[index].copyWith(isMuted: !seats[index].isMuted);
     state = state.copyWith(seats: seats);
+    _syncSeatToSupabase(seats[index]);
+  }
+
+  // --- Host Controls ---
+  void lockAllSeats(bool lock) {
+    if (!state.room.isHost) return;
+    final seats = state.room.seats.map((seat) {
+      if (seat.status == SeatStatus.occupied) return seat;
+      final updatedSeat = seat.copyWith(status: lock ? SeatStatus.locked : SeatStatus.empty);
+      _syncSeatToSupabase(updatedSeat);
+      return updatedSeat;
+    }).toList();
+    state = state.copyWith(seats: seats);
+  }
+
+  void muteAllExceptHost(bool mute) {
+    if (!state.room.isHost) return;
+    final seats = state.room.seats.map((seat) {
+      if (seat.status == SeatStatus.occupied && !seat.isHost) {
+        final updatedSeat = seat.copyWith(isMuted: mute);
+        _syncSeatToSupabase(updatedSeat);
+        return updatedSeat;
+      }
+      return seat;
+    }).toList();
+    state = state.copyWith(seats: seats);
+  }
+
+  Future<void> _syncSeatToSupabase(VoiceSeat seat) async {
+    if (state.room.id.startsWith('room-')) return; // Skip for dummy rooms
+    
+    try {
+      final client = ref.read(supabaseClientProvider);
+      await client.from('room_seats').upsert({
+        'room_id': state.room.id,
+        'seat_number': seat.seatNumber,
+        'user_id': seat.userId,
+        'user_name': seat.userName,
+        'avatar_url': seat.avatarUrl,
+        'is_muted': seat.isMuted,
+        'is_locked': seat.status == SeatStatus.locked,
+        'is_host': seat.isHost,
+        'joined_at': seat.joinedAt?.toIso8601String(),
+      }, onConflict: 'room_id,seat_number');
+    } catch (e) {
+      // Ignore
+    }
   }
 
   // --- Panels ---
