@@ -1,24 +1,30 @@
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../rooms/presentation/room_type.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/network/supabase_client.dart';
 import 'family_watch_room_state.dart';
 import '../models/voice_seat_model.dart';
+import '../../voice/data/voice_repository.dart';
 import '../models/room_member_model.dart';
 import '../models/chat_message_model.dart';
 import '../models/announcement_model.dart';
 import '../models/room_activity_model.dart';
 import '../models/family_watch_room_model.dart';
+import '../models/media_queue_item_model.dart';
+import '../models/playback_state_model.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../profile/data/profile_model.dart';
 
 class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
   RealtimeChannel? _channel;
+  final AgoraVoiceService _voiceService = AgoraVoiceService();
 
   @override
   FamilyWatchRoomState build() {
     ref.onDispose(() {
       _channel?.unsubscribe();
+      _voiceService.leaveChannel();
     });
 
     final profile = ref.read(currentUserProfileProvider).value;
@@ -132,6 +138,30 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         if (ann != null) announcementText = ann['text'] as String? ?? announcementText;
       } catch (_) {}
 
+      // Fetch media queue
+      List<MediaQueueItem> queue = [];
+      try {
+        final queueResponse = await client.from('media_queue')
+            .select()
+            .eq('room_id', roomId)
+            .order('position', ascending: true);
+        queue = queueResponse.cast<Map<String, dynamic>>()
+            .map((q) => MediaQueueItem.fromJson(q))
+            .toList();
+      } catch (_) {}
+
+      // Fetch playback state
+      PlaybackState? playback;
+      try {
+        final pbResponse = await client.from('playback_state')
+            .select()
+            .eq('room_id', roomId)
+            .maybeSingle();
+        if (pbResponse != null) {
+          playback = PlaybackState.fromJson(pbResponse);
+        }
+      } catch (_) {}
+
       final room = FamilyWatchRoom(
         id: roomResponse['id'],
         name: roomResponse['name'],
@@ -139,18 +169,25 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         hostId: hostId,
         currentUserId: userId,
         roomType: type,
-        currentVideoId: roomResponse['current_video_id'],
-        currentPosition: roomResponse['current_position'] ?? 0,
-        isPlaying: roomResponse['is_playing'] ?? false,
         micLocked: roomResponse['mic_locked'] ?? false,
         seats: seats,
         members: members,
         announcement: Announcement(text: announcementText, updatedAt: DateTime.now()),
+        playbackState: playback,
+        queue: queue,
       );
 
       state = state.copyWith(
         isLoading: false,
         room: room,
+      );
+
+      final hasSeat = seats.any((s) => s.userId == userId);
+      await _voiceService.initAgora(
+        roomId,
+        isBroadcaster: hasSeat,
+        isMuted: state.isMuted,
+        isSpeakerMuted: state.isSpeakerMuted,
       );
 
       _initRealtime(roomId);
@@ -189,6 +226,8 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       hostId: state.room.hostId,
       currentUserId: state.room.currentUserId,
       roomType: type,
+      playbackState: state.room.playbackState,
+      queue: state.room.queue,
     );
     state = state.copyWith(room: updatedRoom);
 
@@ -214,6 +253,8 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       hostId: state.room.hostId,
       currentUserId: state.room.currentUserId,
       roomType: type,
+      playbackState: state.room.playbackState,
+      queue: state.room.queue,
     );
     state = state.copyWith(room: updatedRoom);
   }
@@ -226,7 +267,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     final client = ref.read(supabaseClientProvider);
     _channel = client.channel('room:data:$roomId');
     
-    // Listen for room updates (movie state, etc.)
+    // Listen for room updates (mic_locked, room_type, etc.)
     _channel!.onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
@@ -237,7 +278,37 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
         value: roomId,
       ),
       callback: (payload) {
-        _handleMovieSync(payload.newRecord);
+        _handleRoomMetaSync(payload.newRecord);
+      },
+    );
+
+    // Listen for playback_state updates (play/pause/seek/next)
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'playback_state',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'room_id',
+        value: roomId,
+      ),
+      callback: (payload) {
+        _handlePlaybackStateSync(payload.newRecord);
+      },
+    );
+
+    // Listen for media_queue changes (add/remove/reorder)
+    _channel!.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'media_queue',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'room_id',
+        value: roomId,
+      ),
+      callback: (payload) {
+        _handleQueueSync(payload.eventType, payload.newRecord, payload.oldRecord);
       },
     );
 
@@ -376,66 +447,248 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       seats: seats,
       members: _buildMembersFromSeats(seats),
     );
+
+    final hasSeat = seats.any((s) => s.userId == state.room.currentUserId);
+    _voiceService.updateVoiceState(
+      isBroadcaster: hasSeat,
+      isMuted: state.isMuted,
+      isSpeakerMuted: state.isSpeakerMuted,
+    );
   }
 
-  void _handleMovieSync(Map<String, dynamic> data) {
-    final videoId = data['current_video_id'] as String?;
-    final position = data['current_position'] as int? ?? 0;
-    final isPlaying = data['is_playing'] as bool? ?? false;
-    final micLocked = data['mic_locked'] as bool? ?? false;
-
-    final updatedRoom = FamilyWatchRoom(
-      id: state.room.id,
-      name: state.room.name,
-      roomId: state.room.roomId,
-      points: state.room.points,
-      seats: state.room.seats,
-      members: state.room.members,
-      announcement: state.room.announcement,
-      messages: state.room.messages,
-      activities: state.room.activities,
-      hostId: state.room.hostId,
-      currentUserId: state.room.currentUserId,
-      roomType: state.room.roomType,
-      currentVideoId: videoId,
-      currentPosition: position,
-      isPlaying: isPlaying,
-      micLocked: micLocked,
-    );
-    state = state.copyWith(room: updatedRoom);
+  // --- Rooms Meta Sync (mic_locked, room_type changes) ---
+  void _handleRoomMetaSync(Map<String, dynamic> data) {
+    final micLocked = data['mic_locked'] as bool? ?? state.room.micLocked;
+    state = state.copyWith(micLocked: micLocked);
   }
 
-  Future<void> updateMovieState(String? videoId, bool isPlaying, int position) async {
-    final updatedRoom = FamilyWatchRoom(
-      id: state.room.id,
-      name: state.room.name,
-      roomId: state.room.roomId,
-      points: state.room.points,
-      seats: state.room.seats,
-      members: state.room.members,
-      announcement: state.room.announcement,
-      messages: state.room.messages,
-      activities: state.room.activities,
-      hostId: state.room.hostId,
-      currentUserId: state.room.currentUserId,
-      roomType: state.room.roomType,
-      currentVideoId: videoId,
-      currentPosition: position,
-      isPlaying: isPlaying,
+  // --- Playback State Sync ---
+  void _handlePlaybackStateSync(Map<String, dynamic> data) {
+    if (data.isEmpty) return;
+    try {
+      final newPlayback = PlaybackState.fromJson(data);
+      // Don't overwrite if this client is the one who made the update
+      if (newPlayback.updatedBy == state.room.currentUserId) return;
+      state = state.copyWith(playbackState: newPlayback);
+    } catch (_) {}
+  }
+
+  // --- Queue Realtime Sync ---
+  void _handleQueueSync(
+    PostgresChangeEvent eventType,
+    Map<String, dynamic> newRecord,
+    Map<String, dynamic> oldRecord,
+  ) {
+    if (eventType == PostgresChangeEvent.delete) {
+      final deletedId = oldRecord['id'] as String?;
+      if (deletedId != null) {
+        final updatedQueue = state.room.queue.where((q) => q.id != deletedId).toList();
+        state = state.copyWith(queue: updatedQueue);
+      }
+    } else if (newRecord.isNotEmpty) {
+      try {
+        final item = MediaQueueItem.fromJson(newRecord);
+        final existingIdx = state.room.queue.indexWhere((q) => q.id == item.id);
+        final updatedQueue = [...state.room.queue];
+        if (existingIdx != -1) {
+          updatedQueue[existingIdx] = item;
+        } else {
+          updatedQueue.add(item);
+        }
+        updatedQueue.sort((a, b) => a.position.compareTo(b.position));
+        state = state.copyWith(queue: updatedQueue);
+      } catch (_) {}
+    }
+  }
+
+  // --- Host Playback Controls ---
+
+  /// Update the playback_state table. Host-only.
+  Future<void> updatePlaybackState({
+    String? currentQueueItemId,
+    bool? isPlaying,
+    int? currentPosition,
+  }) async {
+    if (!state.room.isHost) return;
+
+    final now = DateTime.now();
+    final newPlayback = PlaybackState(
+      roomId: state.room.id,
+      currentQueueItemId: currentQueueItemId ?? state.room.playbackState?.currentQueueItemId,
+      isPlaying: isPlaying ?? state.room.playbackState?.isPlaying ?? false,
+      currentPosition: currentPosition ?? state.room.playbackState?.currentPosition ?? 0,
+      updatedBy: state.room.currentUserId,
+      updatedAt: now,
     );
-    state = state.copyWith(room: updatedRoom);
+
+    state = state.copyWith(playbackState: newPlayback);
 
     if (!state.room.id.startsWith('room-')) {
       try {
         final client = ref.read(supabaseClientProvider);
-        await client.from('rooms').update({
-          'current_video_id': videoId,
-          'current_position': position,
-          'is_playing': isPlaying,
-          'video_updated_at': DateTime.now().toIso8601String(),
-        }).eq('id', state.room.id);
+        await client.from('playback_state').upsert(
+          newPlayback.toJson(),
+          onConflict: 'room_id',
+        );
       } catch (_) {}
     }
+  }
+
+  /// Play the next item in queue. If at end, stop playback.
+  Future<void> playNextInQueue() async {
+    if (!state.room.isHost) return;
+
+    final queue = state.room.queue;
+    if (queue.isEmpty) return;
+
+    final currentId = state.room.playbackState?.currentQueueItemId;
+    int nextIndex = 0;
+    if (currentId != null) {
+      final currentIdx = queue.indexWhere((q) => q.id == currentId);
+      nextIndex = currentIdx + 1;
+    }
+
+    if (nextIndex >= queue.length) {
+      // End of queue – stop playback
+      await updatePlaybackState(isPlaying: false, currentPosition: 0);
+      return;
+    }
+
+    await updatePlaybackState(
+      currentQueueItemId: queue[nextIndex].id,
+      isPlaying: true,
+      currentPosition: 0,
+    );
+  }
+
+  // --- Queue CRUD ---
+
+  /// Any user can add a video to the queue.
+  Future<void> addToQueue({
+    required String title,
+    required String mediaUrl,
+    String? thumbnailUrl,
+    String mediaType = 'youtube',
+  }) async {
+    final queue = state.room.queue;
+    final nextPosition = queue.isEmpty ? 0 : queue.last.position + 1;
+    final userId = state.room.currentUserId;
+
+    if (state.room.id.startsWith('room-')) return;
+
+    try {
+      final client = ref.read(supabaseClientProvider);
+      final response = await client.from('media_queue').insert({
+        'room_id': state.room.id,
+        'title': title,
+        'media_url': mediaUrl,
+        'thumbnail_url': thumbnailUrl,
+        'media_type': mediaType,
+        'added_by': userId,
+        'position': nextPosition,
+      }).select().single();
+      
+      // If host adds the very first item, start playing it immediately
+      if (state.room.isHost && queue.isEmpty) {
+        updatePlaybackState(
+          currentQueueItemId: response['id'],
+          isPlaying: true,
+          currentPosition: 0,
+        );
+      }
+      
+      // Realtime will handle updating the local queue
+    } catch (e) {
+      print('Error adding to queue: $e');
+    }
+  }
+
+  /// Host-only: remove a video from the queue.
+  Future<void> removeFromQueue(String queueItemId) async {
+    if (!state.room.isHost) return;
+    if (state.room.id.startsWith('room-')) return;
+
+    try {
+      final client = ref.read(supabaseClientProvider);
+      await client.from('media_queue').delete().eq('id', queueItemId);
+      // Realtime will handle updating the local queue
+    } catch (e) {
+      print('Error removing from queue: $e');
+    }
+  }
+
+  /// Host-only: reorder queue items.
+  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    if (!state.room.isHost) return;
+
+    final queue = [...state.room.queue];
+    if (oldIndex < 0 || oldIndex >= queue.length) return;
+    if (newIndex < 0 || newIndex >= queue.length) return;
+
+    final item = queue.removeAt(oldIndex);
+    queue.insert(newIndex, item);
+
+    // Update positions locally
+    final reorderedQueue = <MediaQueueItem>[];
+    for (int i = 0; i < queue.length; i++) {
+      reorderedQueue.add(queue[i].copyWith(position: i));
+    }
+    state = state.copyWith(queue: reorderedQueue);
+
+    // Persist new positions to Supabase
+    if (!state.room.id.startsWith('room-')) {
+      try {
+        final client = ref.read(supabaseClientProvider);
+        for (final q in reorderedQueue) {
+          await client.from('media_queue').update({
+            'position': q.position,
+          }).eq('id', q.id);
+        }
+      } catch (e) {
+        print('Error reordering queue: $e');
+      }
+    }
+  }
+
+  // --- Invite System ---
+
+  /// Host generates an invite code for the room.
+  Future<String?> generateInviteCode() async {
+    if (!state.room.isHost) return null;
+    if (state.room.id.startsWith('room-')) return null;
+
+    final code = _generateRandomCode(8);
+    final expiresAt = DateTime.now().add(const Duration(hours: 24));
+
+    try {
+      final client = ref.read(supabaseClientProvider);
+      await client.from('room_invites').insert({
+        'room_id': state.room.id,
+        'invite_code': code,
+        'created_by': state.room.currentUserId,
+        'expires_at': expiresAt.toIso8601String(),
+      });
+      return code;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _generateRandomCode(int length) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    final rng = Random();
+    return List.generate(length, (_) => chars[rng.nextInt(chars.length)]).join();
+  }
+
+  // --- Queue Panel Toggle ---
+  void toggleQueuePanel() {
+    state = state.copyWith(
+      showQueuePanel: !state.showQueuePanel,
+      showMembersPanel: false,
+      showInvitePanel: false,
+      showSettingsPanel: false,
+      showSocialPanel: false,
+    );
   }
 
   // --- Search ---
@@ -484,7 +737,25 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
   // --- Mute / Chat ---
 
   void toggleMute() {
-    state = state.copyWith(isMuted: !state.isMuted);
+    final newMuted = !state.isMuted;
+    state = state.copyWith(isMuted: newMuted);
+    final hasSeat = state.room.seats.any((s) => s.userId == state.room.currentUserId);
+    _voiceService.updateVoiceState(
+      isBroadcaster: hasSeat,
+      isMuted: newMuted,
+      isSpeakerMuted: state.isSpeakerMuted,
+    );
+  }
+
+  void toggleSpeakerMute() {
+    final newSpeakerMuted = !state.isSpeakerMuted;
+    state = state.copyWith(isSpeakerMuted: newSpeakerMuted);
+    final hasSeat = state.room.seats.any((s) => s.userId == state.room.currentUserId);
+    _voiceService.updateVoiceState(
+      isBroadcaster: hasSeat,
+      isMuted: state.isMuted,
+      isSpeakerMuted: newSpeakerMuted,
+    );
   }
 
   void setChatInput(String value) {
@@ -586,6 +857,12 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       members: _updateMembersFromSeats(seats, existingIndex != -1 ? existingIndex : null, index),
     );
     _syncSeatToSupabase(seats[index]);
+
+    _voiceService.updateVoiceState(
+      isBroadcaster: true,
+      isMuted: state.isMuted,
+      isSpeakerMuted: state.isSpeakerMuted,
+    );
   }
 
   void leaveSeat(int seatNumber) {
@@ -611,6 +888,14 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       members: state.room.members.where((m) => m.id != leavingUserId).toList(),
     );
     _syncSeatToSupabase(seats[index]);
+
+    if (leavingUserId == state.room.currentUserId) {
+      _voiceService.updateVoiceState(
+        isBroadcaster: false,
+        isMuted: state.isMuted,
+        isSpeakerMuted: state.isSpeakerMuted,
+      );
+    }
   }
 
   List<RoomMember> _updateMembersFromSeats(List<VoiceSeat> seats, int? oldSeatIndex, int newSeatIndex) {
@@ -736,10 +1021,44 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
     }
   }
 
-  void inviteToMic(String userId) {
+  void inviteToMic(String userId) async {
     if (!state.room.isHost) return;
-    // In a full implementation, this would send a realtime broadcast or push notification
-    // For now, we can log it or show a local toast
+    final member = state.room.members.firstWhere(
+      (m) => m.id == userId,
+      orElse: () => RoomMember(id: userId, name: 'User', score: 0),
+    );
+    
+    final messageText = 'invited ${member.name} to join the mic';
+    
+    final message = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      senderId: state.room.currentUserId,
+      senderName: 'Room Host',
+      senderAvatarUrl: null,
+      text: messageText,
+      timestamp: DateTime.now(),
+      isHost: true,
+    );
+
+    state = state.copyWith(
+      messages: [...state.room.messages, message],
+    );
+
+    if (!state.room.id.startsWith('room-') && _channel != null) {
+      try {
+        await _channel!.sendBroadcastMessage(
+          event: 'chat_message',
+          payload: {
+            'id': message.id,
+            'sender_id': message.senderId,
+            'sender_name': 'Room Host',
+            'text': messageText,
+            'timestamp': message.timestamp.toIso8601String(),
+            'is_host': true,
+          },
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _syncSeatToSupabase(VoiceSeat seat) async {
@@ -771,6 +1090,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       showInvitePanel: false,
       showSettingsPanel: false,
       showSocialPanel: false,
+      showQueuePanel: false,
     );
   }
 
@@ -780,6 +1100,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       showMembersPanel: false,
       showSettingsPanel: false,
       showSocialPanel: false,
+      showQueuePanel: false,
     );
   }
 
@@ -789,6 +1110,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       showMembersPanel: false,
       showInvitePanel: false,
       showSocialPanel: false,
+      showQueuePanel: false,
     );
   }
 
@@ -798,6 +1120,7 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
       showInvitePanel: false,
       showSettingsPanel: false,
       showSocialPanel: false,
+      showQueuePanel: false,
     );
   }
 
@@ -861,6 +1184,8 @@ class FamilyWatchRoomViewModel extends Notifier<FamilyWatchRoomState> {
           .eq('room_id', roomId)
           .eq('user_id', userId);
     } catch (_) {}
+
+    await _voiceService.leaveChannel();
   }
 }
 

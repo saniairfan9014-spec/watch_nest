@@ -43,6 +43,7 @@ dependencies:
   equatable: ^2.0.8
   uuid: ^4.5.3
   agora_rtc_engine: ^6.6.3
+  permission_handler: ^11.3.1
   youtube_player_iframe: ^6.0.2
   google_fonts: ^8.1.0
   image_picker: ^1.1.2

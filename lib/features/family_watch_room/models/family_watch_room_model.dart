@@ -5,6 +5,8 @@ import 'room_member_model.dart';
 import 'chat_message_model.dart';
 import 'announcement_model.dart';
 import 'room_activity_model.dart';
+import 'playback_state_model.dart';
+import 'media_queue_item_model.dart';
 
 class FamilyWatchRoom extends Equatable {
   final String id;
@@ -19,11 +21,11 @@ class FamilyWatchRoom extends Equatable {
   final String hostId;
   final String currentUserId;
   final RoomType roomType;
-  final String? currentVideoId;
-  final int currentPosition;
-  final bool isPlaying;
   final bool micLocked;
-  final DateTime? videoUpdatedAt;
+
+  // --- New: Queue & Playback State ---
+  final PlaybackState? playbackState;
+  final List<MediaQueueItem> queue;
 
   const FamilyWatchRoom({
     required this.id,
@@ -38,14 +40,19 @@ class FamilyWatchRoom extends Equatable {
     required this.hostId,
     required this.currentUserId,
     this.roomType = RoomType.general,
-    this.currentVideoId,
-    this.currentPosition = 0,
-    this.isPlaying = false,
     this.micLocked = false,
-    this.videoUpdatedAt,
+    this.playbackState,
+    this.queue = const [],
   });
 
   bool get isHost => currentUserId == hostId;
+
+  /// Returns the currently-playing queue item, or null.
+  MediaQueueItem? get currentQueueItem {
+    if (playbackState?.currentQueueItemId == null) return null;
+    final idx = queue.indexWhere((q) => q.id == playbackState!.currentQueueItemId);
+    return idx != -1 ? queue[idx] : null;
+  }
 
   @override
   List<Object?> get props => [
@@ -61,10 +68,9 @@ class FamilyWatchRoom extends Equatable {
         hostId,
         currentUserId,
         roomType,
-        currentVideoId,
-        currentPosition,
-        isPlaying,
         micLocked,
-        videoUpdatedAt,
+        playbackState,
+        queue,
       ];
 }
+

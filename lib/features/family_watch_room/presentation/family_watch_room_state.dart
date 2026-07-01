@@ -4,16 +4,20 @@ import '../models/room_member_model.dart';
 import '../models/chat_message_model.dart';
 import '../models/announcement_model.dart';
 import '../models/room_activity_model.dart';
+import '../models/playback_state_model.dart';
+import '../models/media_queue_item_model.dart';
 
 class FamilyWatchRoomState {
   final FamilyWatchRoom room;
   final bool isLoading;
   final bool isMuted;
+  final bool isSpeakerMuted;
   final String chatInput;
   final bool showMembersPanel;
   final bool showInvitePanel;
   final bool showSettingsPanel;
   final bool showSocialPanel;
+  final bool showQueuePanel;
   final bool isEditingAnnouncement;
   final String announcementDraft;
   final String searchQuery;
@@ -26,11 +30,13 @@ class FamilyWatchRoomState {
     required this.room,
     this.isLoading = true,
     this.isMuted = false,
+    this.isSpeakerMuted = false,
     this.chatInput = '',
     this.showMembersPanel = false,
     this.showInvitePanel = false,
     this.showSettingsPanel = false,
     this.showSocialPanel = false,
+    this.showQueuePanel = false,
     this.isEditingAnnouncement = false,
     this.announcementDraft = '',
     this.searchQuery = '',
@@ -44,11 +50,13 @@ class FamilyWatchRoomState {
     FamilyWatchRoom? room,
     bool? isLoading,
     bool? isMuted,
+    bool? isSpeakerMuted,
     String? chatInput,
     bool? showMembersPanel,
     bool? showInvitePanel,
     bool? showSettingsPanel,
     bool? showSocialPanel,
+    bool? showQueuePanel,
     bool? isEditingAnnouncement,
     String? announcementDraft,
     String? searchQuery,
@@ -62,10 +70,13 @@ class FamilyWatchRoomState {
     List<RoomActivity>? activities,
     Announcement? announcement,
     bool? micLocked,
+    PlaybackState? playbackState,
+    List<MediaQueueItem>? queue,
   }) {
     var updatedRoom = room ?? this.room;
     if (seats != null || members != null || messages != null ||
-        activities != null || announcement != null || micLocked != null) {
+        activities != null || announcement != null || micLocked != null ||
+        playbackState != null || queue != null) {
       updatedRoom = FamilyWatchRoom(
         id: updatedRoom.id,
         name: updatedRoom.name,
@@ -79,22 +90,22 @@ class FamilyWatchRoomState {
         hostId: updatedRoom.hostId,
         currentUserId: updatedRoom.currentUserId,
         roomType: updatedRoom.roomType,
-        currentVideoId: updatedRoom.currentVideoId,
-        currentPosition: updatedRoom.currentPosition,
-        isPlaying: updatedRoom.isPlaying,
         micLocked: micLocked ?? updatedRoom.micLocked,
-        videoUpdatedAt: updatedRoom.videoUpdatedAt,
+        playbackState: playbackState ?? updatedRoom.playbackState,
+        queue: queue ?? updatedRoom.queue,
       );
     }
     return FamilyWatchRoomState(
       room: updatedRoom,
       isLoading: isLoading ?? this.isLoading,
       isMuted: isMuted ?? this.isMuted,
+      isSpeakerMuted: isSpeakerMuted ?? this.isSpeakerMuted,
       chatInput: chatInput ?? this.chatInput,
       showMembersPanel: showMembersPanel ?? this.showMembersPanel,
       showInvitePanel: showInvitePanel ?? this.showInvitePanel,
       showSettingsPanel: showSettingsPanel ?? this.showSettingsPanel,
       showSocialPanel: showSocialPanel ?? this.showSocialPanel,
+      showQueuePanel: showQueuePanel ?? this.showQueuePanel,
       isEditingAnnouncement: isEditingAnnouncement ?? this.isEditingAnnouncement,
       announcementDraft: announcementDraft ?? this.announcementDraft,
       searchQuery: searchQuery ?? this.searchQuery,
@@ -105,3 +116,4 @@ class FamilyWatchRoomState {
     );
   }
 }
+
